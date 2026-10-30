@@ -1,6 +1,7 @@
 // 설정(settings.json)과 자격증명(credentials.json)의 기본값, 읽기/쓰기, 마스킹.
 import fs from 'node:fs';
-import { DIRS, FILES, readJson, writeJson, ensureDirs } from './lib/paths.js';
+import path from 'node:path';
+import { DIRS, FILES, readJson, writeJson, ensureDirs, httpError } from './lib/paths.js';
 
 /** 지원 프로바이더 정의. 새 프로바이더 추가 방법은 docs/dev/providers.md 참고 */
 export const PROVIDERS = {
@@ -59,7 +60,8 @@ export const DEFAULT_SETTINGS = {
   /** 파일 탐색기/내보내기에서 접근을 허용할 폴더 목록. 데이터 폴더는 항상 포함된다. */
   allowedRoots: [],
   chat: {
-    maxOutputTokens: 16000,
+    /** 스트리밍이므로 넉넉히. Claude 5 세대는 thinking 토큰도 여기 포함된다. */
+    maxOutputTokens: 32000,
     includeProblem: true,
     includeReferences: true,
     includeAnswer: false,
@@ -110,18 +112,64 @@ export function loadSettings() {
   return merged;
 }
 
+/** 설정 패치 검증. 잘못되면 400 오류. */
+export function validateSettingsPatch(patch) {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw httpError(400, '설정은 객체여야 합니다.');
+  if ('port' in patch) {
+    const p = Number(patch.port);
+    if (!Number.isInteger(p) || p < 1 || p > 65535) throw httpError(400, '포트는 1~65535 사이의 정수여야 합니다.');
+    patch.port = p;
+  }
+  if ('defaultProvider' in patch && !PROVIDERS[patch.defaultProvider]) throw httpError(400, `알 수 없는 프로바이더: ${patch.defaultProvider}`);
+  if ('models' in patch) {
+    if (!patch.models || typeof patch.models !== 'object' || Array.isArray(patch.models)) throw httpError(400, 'models 는 객체여야 합니다.');
+    for (const [k, v] of Object.entries(patch.models)) {
+      if (!PROVIDERS[k]) throw httpError(400, `알 수 없는 프로바이더: ${k}`);
+      if (typeof v !== 'string') throw httpError(400, `${k} 모델 ID 는 문자열이어야 합니다.`);
+      patch.models[k] = v.trim();
+    }
+  }
+  if ('allowedRoots' in patch) {
+    if (!Array.isArray(patch.allowedRoots)) throw httpError(400, 'allowedRoots 는 폴더 경로 배열이어야 합니다.');
+    patch.allowedRoots = patch.allowedRoots.map((s) => (typeof s === 'string' ? s.trim() : '')).filter(Boolean);
+    for (const r of patch.allowedRoots) {
+      if (!path.isAbsolute(r)) throw httpError(400, `절대 경로여야 합니다: ${r}`);
+      if (!fs.existsSync(r) || !fs.statSync(r).isDirectory()) throw httpError(400, `존재하지 않는 폴더: ${r}`);
+    }
+  }
+  if (patch.chat) {
+    if (typeof patch.chat !== 'object') throw httpError(400, 'chat 설정이 잘못되었습니다.');
+    for (const k of ['maxOutputTokens', 'maxReferenceChars']) {
+      if (k in patch.chat) {
+        const n = Number(patch.chat[k]);
+        if (!Number.isInteger(n) || n < (k === 'maxOutputTokens' ? 256 : 1000) || n > 2000000) throw httpError(400, `${k} 값이 범위를 벗어났습니다.`);
+        patch.chat[k] = n;
+      }
+    }
+    for (const k of ['includeProblem', 'includeReferences', 'includeAnswer']) if (k in patch.chat) patch.chat[k] = Boolean(patch.chat[k]);
+  }
+  if (patch.editor && 'autosaveMs' in patch.editor) {
+    const n = Number(patch.editor.autosaveMs);
+    if (!Number.isInteger(n) || n < 300 || n > 600000) throw httpError(400, '자동 저장 간격은 300~600000ms 사이여야 합니다.');
+    patch.editor.autosaveMs = n;
+  }
+  if (patch.anthropic && 'fallbacks' in patch.anthropic) patch.anthropic.fallbacks = Boolean(patch.anthropic.fallbacks);
+  return patch;
+}
+
 export function saveSettings(patch) {
+  validateSettingsPatch(patch);
   const current = loadSettings();
   const next = deepMerge(current, patch);
-  // allowedRoots 는 배열 교체
-  if (Array.isArray(patch.allowedRoots)) next.allowedRoots = patch.allowedRoots.filter((s) => typeof s === 'string' && s.trim());
+  if (Array.isArray(patch.allowedRoots)) next.allowedRoots = patch.allowedRoots; // 배열은 교체
   writeJson(FILES.settings, next);
   return next;
 }
 
 /** 실제 접근 허용 루트 = 데이터 폴더 + 사용자가 추가한 폴더 */
 export function getAllowedRoots(settings = loadSettings()) {
-  return [DIRS.data, ...(settings.allowedRoots || [])];
+  const extra = Array.isArray(settings.allowedRoots) ? settings.allowedRoots.filter((r) => typeof r === 'string' && r.trim()) : [];
+  return [DIRS.data, ...extra];
 }
 
 /** 파일 값에 환경변수를 덮어쓴 "실효" 자격증명 */

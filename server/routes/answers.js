@@ -4,6 +4,7 @@ import path from 'node:path';
 import * as store from '../lib/store.js';
 import { htmlToMarkdown, htmlToText, countChars } from '../lib/html2md.js';
 import { httpError, resolveAllowed, safeName } from '../lib/paths.js';
+import { sendUserFile } from '../lib/sendfile.js';
 import { getAllowedRoots } from '../config.js';
 
 export const answersRouter = Router();
@@ -15,6 +16,8 @@ answersRouter.get('/answers/:wb/:p', (req, res) => res.json(store.getAnswer(req.
 
 answersRouter.put('/answers/:wb/:p', (req, res) => {
   const { html, status } = req.body || {};
+  if (html !== undefined && typeof html !== 'string') throw httpError(400, 'html 은 문자열이어야 합니다.');
+  if (status !== undefined && !['draft', 'done'].includes(status)) throw httpError(400, 'status 는 draft 또는 done 이어야 합니다.');
   const saved = store.saveAnswer(req.params.wb, req.params.p, { html, status });
   res.json({ ...saved, chars: countChars(htmlToText(saved.html)) });
 });
@@ -33,7 +36,7 @@ answersRouter.post('/answers/:wb/:p/attachments', (req, res) => {
 answersRouter.get('/answers/:wb/:p/attachments/:file', (req, res) => {
   const file = store.attachmentPath(req.params.wb, req.params.p, req.params.file);
   if (req.query.download) return res.download(file);
-  res.sendFile(file);
+  sendUserFile(res, file);
 });
 
 answersRouter.delete('/answers/:wb/:p/attachments/:file', (req, res) => {

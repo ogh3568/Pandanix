@@ -5,7 +5,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { DIRS, FILES, PROJECT_ROOT, IS_WINDOWS, readJson, exists } from './lib/paths.js';
-import { PROVIDERS, loadSettings, loadCredentials, getAllowedRoots } from './config.js';
+import { PROVIDERS, DEFAULT_SETTINGS, loadSettings, loadCredentials, getAllowedRoots } from './config.js';
 import { getProvider } from './providers/index.js';
 
 const require = createRequire(import.meta.url);
@@ -82,7 +82,7 @@ export async function runDoctor({ live = false, serverRunning = false } = {}) {
       continue;
     }
     try {
-      JSON.parse(fs.readFileSync(file, 'utf8'));
+      JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
       add({ id, name, status: 'ok', detail: file, fix: '' });
     } catch (err) {
       add({ id, name, status: 'fail', detail: `JSON 문법 오류: ${err.message}`, fix: `${file} 을 열어 JSON 문법을 고치거나, 파일을 삭제한 뒤 서버를 다시 시작하세요.` });
@@ -99,21 +99,27 @@ export async function runDoctor({ live = false, serverRunning = false } = {}) {
     fix: /credentials\.json/.test(gi) ? '' : '.gitignore 에 `data/config/credentials.json` 줄을 추가하세요.',
   });
 
-  // 7. 프로바이더 키
-  const creds = loadCredentials();
-  const settings = loadSettings();
+  // 7. 프로바이더 키 (설정 파일이 깨져 있어도 doctor 는 끝까지 돌아야 한다)
+  let creds = {};
+  let settings = DEFAULT_SETTINGS;
+  try {
+    creds = loadCredentials();
+    settings = loadSettings();
+  } catch (err) {
+    add({ id: 'configload', name: '설정 로드', status: 'fail', detail: err.message, fix: '위의 설정/자격증명 파일 오류를 먼저 고치세요. 아래 항목은 기본값으로 점검합니다.' });
+  }
   let anyKey = false;
   for (const [name, def] of Object.entries(PROVIDERS)) {
     const c = creds[name] || {};
-    const has = Boolean(c.apiKey);
+    const optional = Boolean(def.keyOptional);
+    const has = Boolean(c.apiKey) || (optional && Boolean(c.baseUrl)); // 키 선택 프로바이더는 Base URL 이 있으면 사용 가능으로 본다
     if (has) anyKey = true;
     const isDefault = settings.defaultProvider === name;
-    const optional = Boolean(def.keyOptional);
     add({
       id: `key:${name}`,
       name: `API 키 - ${def.label}${isDefault ? ' (기본)' : ''}`,
       status: has ? 'ok' : isDefault ? 'fail' : optional ? 'ok' : 'warn',
-      detail: has ? `설정됨 (${c._source === 'env' ? '환경변수 ' + def.envKey : 'credentials.json'})` : optional ? '선택 사항 (로컬 서버용)' : '미설정',
+      detail: c.apiKey ? `설정됨 (${c._source === 'env' ? '환경변수 ' + def.envKey : 'credentials.json'})` : optional ? (c.baseUrl ? `키 없음, Base URL ${c.baseUrl}` : '선택 사항 (로컬 서버용)') : '미설정',
       fix: has || optional ? '' : `설정 화면에서 키를 입력하거나 환경변수 ${def.envKey} 를 지정하세요.${def.keyUrl ? ` 발급: ${def.keyUrl}` : ''}`,
     });
   }
@@ -148,14 +154,14 @@ export async function runDoctor({ live = false, serverRunning = false } = {}) {
   let wbCount = 0;
   const broken = [];
   if (exists(DIRS.workbooks)) {
-    for (const name of fs.readdirSync(DIRS.workbooks)) {
+    for (const name of fs.readdirSync(DIRS.workbooks, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)) {
       const f = path.join(DIRS.workbooks, name, 'workbook.json');
       if (!exists(f)) {
         broken.push(name);
         continue;
       }
       try {
-        JSON.parse(fs.readFileSync(f, 'utf8'));
+        JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''));
         wbCount++;
       } catch {
         broken.push(name);

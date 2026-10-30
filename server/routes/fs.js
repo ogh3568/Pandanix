@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { getAllowedRoots } from '../config.js';
-import { resolveAllowed, httpError, IS_WINDOWS } from '../lib/paths.js';
+import { resolveAllowed, httpError, IS_WINDOWS, samePath, DIRS, isInside, readTextSmart } from '../lib/paths.js';
 import { TEXT_EXTS } from '../lib/store.js';
 
 export const fsRouter = Router();
@@ -55,13 +55,17 @@ fsRouter.get('/fs/read', (req, res) => {
   const size = fs.statSync(abs).size;
   if (!TEXT_EXTS.has(ext)) return res.json({ path: abs, binary: true, size });
   if (size > MAX_TEXT_READ) throw httpError(413, '2MB 보다 큰 텍스트 파일은 미리보기할 수 없습니다.');
-  res.json({ path: abs, content: fs.readFileSync(abs, 'utf8'), size });
+  res.json({ path: abs, content: readTextSmart(abs), size });
 });
 
 /** 텍스트 파일 쓰기/생성 { path, content, overwrite? } */
 fsRouter.post('/fs/write', (req, res) => {
-  const { content = '', overwrite = true } = req.body || {};
+  const { content = '' } = req.body || {};
+  const overwrite = req.body?.overwrite === undefined ? true : req.body.overwrite === true || req.body.overwrite === 'true';
+  if (typeof content !== 'string') throw httpError(400, 'content 는 문자열이어야 합니다.');
   const abs = resolveAllowed(req.body?.path, getAllowedRoots());
+  assertNotSystemPath(abs);
+  if (fs.existsSync(abs) && fs.statSync(abs).isDirectory()) throw httpError(400, '같은 이름의 폴더가 있습니다.');
   if (fs.existsSync(abs) && !overwrite) throw httpError(409, '이미 파일이 있습니다.');
   fs.mkdirSync(path.dirname(abs), { recursive: true });
   fs.writeFileSync(abs, String(content), 'utf8');
@@ -76,19 +80,30 @@ fsRouter.post('/fs/mkdir', (req, res) => {
 
 fsRouter.post('/fs/delete', (req, res) => {
   const abs = resolveAllowed(req.body?.path, getAllowedRoots());
-  if (getAllowedRoots().some((r) => path.resolve(r) === abs)) throw httpError(400, '허용 루트 자체는 삭제할 수 없습니다.');
+  if (getAllowedRoots().some((r) => samePath(r, abs))) throw httpError(400, '허용 루트 자체는 삭제할 수 없습니다.');
+  assertNotSystemPath(abs);
   if (!fs.existsSync(abs)) throw httpError(404, '대상이 없습니다.');
   fs.rmSync(abs, { recursive: true, force: true });
   res.json({ ok: true });
 });
+
+/** data/ 안의 앱 내부 폴더(workbooks, answers, config, tmp 자체)는 탐색기로 쓰거나 지울 수 없다. 그 안의 파일은 가능. */
+function assertNotSystemPath(abs) {
+  const system = [DIRS.data, DIRS.workbooks, DIRS.answers, DIRS.tmp];
+  if (system.some((d) => samePath(d, abs))) throw httpError(400, '앱 내부 폴더는 파일 탐색기에서 지우거나 덮어쓸 수 없습니다. 문제집은 목록의 삭제 메뉴를 사용하세요.');
+  if (isInside(DIRS.config, abs)) throw httpError(403, '설정·API 키 폴더는 접근할 수 없습니다.');
+}
 
 /** Windows 탐색기로 폴더 열기 */
 fsRouter.post('/fs/open', (req, res) => {
   const abs = resolveAllowed(req.body?.path, getAllowedRoots());
   if (!fs.existsSync(abs)) throw httpError(404, '대상이 없습니다.');
   const target = fs.statSync(abs).isDirectory() ? abs : path.dirname(abs);
-  if (IS_WINDOWS) execFile('explorer.exe', [target]);
-  else if (process.platform === 'darwin') execFile('open', [target]);
-  else execFile('xdg-open', [target]);
-  res.json({ ok: true, path: target });
+  const [cmd, args] = IS_WINDOWS ? ['explorer.exe', [target]] : process.platform === 'darwin' ? ['open', [target]] : ['xdg-open', [target]];
+  execFile(cmd, args, (err) => {
+    if (res.headersSent) return;
+    // explorer.exe 는 정상 실행 후에도 종료 코드 1 을 돌려주므로 ENOENT(명령 없음)만 오류로 본다
+    if (err && err.code === 'ENOENT') return res.status(500).json({ error: `파일 탐색기를 열 수 없습니다 (${cmd} 없음). 경로: ${target}` });
+    res.json({ ok: true, path: target });
+  });
 });

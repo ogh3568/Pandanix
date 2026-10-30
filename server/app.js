@@ -17,6 +17,8 @@ import { doctorRouter } from './routes/doctor.js';
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  // DNS rebinding 방지: 로컬 전용으로 띄웠을 때 Host 헤더가 localhost 계열이 아니면 거부
+  app.use(hostGuard);
   app.use(express.json({ limit: '80mb' }));
 
   app.get('/api/health', (req, res) => res.json({ ok: true, version: process.env.npm_package_version || '0.1.0', dataDir: DIRS.data }));
@@ -41,12 +43,40 @@ export function createApp() {
   // 오류 핸들러: 항상 JSON { error }
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
-    const status = err.status || (err.type === 'entity.too.large' ? 413 : 500);
+    const { status, message } = describeError(err);
     if (status >= 500) console.error('[pandanix] 오류:', err);
     if (res.headersSent) return res.end();
-    res.status(status).json({ error: err.message || String(err) });
+    res.status(status).json({ error: message });
   });
   return app;
+}
+
+/** 시스템/파서 오류를 사용자가 읽을 수 있는 한국어 문장으로 바꾼다 */
+function describeError(err) {
+  if (err.status && err.message && !err.code) return { status: err.status, message: err.message };
+  if (err.type === 'entity.too.large') return { status: 413, message: '요청이 너무 큽니다. 파일은 60MB 이하로 올리세요.' };
+  if (err.type === 'entity.parse.failed') return { status: 400, message: '요청 본문이 올바른 JSON 이 아닙니다.' };
+  const byCode = {
+    ENOENT: [404, '파일이나 폴더가 없습니다.'],
+    EEXIST: [409, '같은 이름의 파일이나 폴더가 이미 있습니다.'],
+    EISDIR: [400, '파일이 와야 할 자리에 폴더가 있습니다.'],
+    ENOTDIR: [400, '폴더가 와야 할 자리에 파일이 있습니다.'],
+    ENAMETOOLONG: [400, '파일 이름이 너무 깁니다.'],
+    EPERM: [423, '다른 프로그램이 파일을 사용 중이거나 권한이 없습니다. 잠시 후 다시 시도하세요.'],
+    EBUSY: [423, '다른 프로그램이 파일을 사용 중입니다. 잠시 후 다시 시도하세요.'],
+    EACCES: [403, '파일 접근 권한이 없습니다.'],
+    ENOSPC: [507, '디스크 공간이 부족합니다.'],
+  };
+  if (err.code && byCode[err.code]) return { status: err.status || byCode[err.code][0], message: `${byCode[err.code][1]} (${err.code}${err.path ? ': ' + err.path : ''})` };
+  return { status: err.status || 500, message: err.message || String(err) };
+}
+
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+function hostGuard(req, res, next) {
+  if (process.env.HOST && process.env.HOST !== '127.0.0.1' && process.env.HOST !== 'localhost') return next(); // 사용자가 외부 공개를 선택한 경우
+  const host = String(req.headers.host || '').replace(/:\d+$/, '').toLowerCase();
+  if (!host || LOCAL_HOSTS.has(host)) return next();
+  res.status(403).json({ error: `허용되지 않은 Host 헤더입니다: ${host}. 브라우저에서 http://localhost:<포트> 로 접속하세요.` });
 }
 
 export async function startServer() {

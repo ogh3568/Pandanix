@@ -3,7 +3,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import * as store from '../lib/store.js';
 import { wrap } from '../lib/async.js';
-import { httpError, resolveAllowed } from '../lib/paths.js';
+import { httpError, resolveAllowed, safeName, isInside, readTextSmart } from '../lib/paths.js';
+import { sendUserFile } from '../lib/sendfile.js';
 import { getAllowedRoots } from '../config.js';
 import { listLibrary, installLibraryWorkbook } from '../seed.js';
 
@@ -46,7 +47,12 @@ workbooksRouter.post('/workbooks/:wb/problems/:p/references/from-path', (req, re
 workbooksRouter.get('/workbooks/:wb/problems/:p/references/:file', (req, res) => {
   const file = store.referencePath(req.params.wb, req.params.p, req.params.file);
   if (req.query.download) return res.download(file);
-  res.sendFile(file);
+  // ?text=1 : 인코딩(UTF-8/EUC-KR)을 판별해 텍스트로 돌려준다 (미리보기용)
+  if (req.query.text) {
+    res.type('text/plain; charset=utf-8');
+    return res.send(readTextSmart(file));
+  }
+  sendUserFile(res, file);
 });
 
 workbooksRouter.delete('/workbooks/:wb/problems/:p/references/:file', (req, res) => {
@@ -69,12 +75,11 @@ workbooksRouter.post(
   wrap(async (req, res) => {
     const base = resolveAllowed(req.body?.path, getAllowedRoots());
     const wb = store.getWorkbook(req.params.wb);
-    const dest = path.join(base, safeFolder(wb.title) || wb.id);
+    const folder = safeName(wb.title, wb.id);
+    const dest = path.join(base, folder === '.' || folder === '..' ? wb.id : folder);
+    if (!isInside(base, dest) || path.resolve(dest) === path.resolve(base)) throw httpError(400, '내보내기 폴더 이름이 잘못되었습니다.');
     store.exportWorkbookToDir(wb.id, dest);
     res.json({ ok: true, path: dest });
   }),
 );
 
-function safeFolder(name) {
-  return String(name || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim();
-}

@@ -9,8 +9,8 @@ AI 를 쓰려면 프로바이더(AI 회사) 중 **하나 이상**의 API 키가 
 | Claude (Anthropic) | [console.anthropic.com](https://console.anthropic.com/settings/keys) | `claude-opus-5-5` | 기본 프로바이더 |
 | GPT (OpenAI) | [platform.openai.com](https://platform.openai.com/api-keys) | `gpt-5` | Base URL 비우면 공식 API |
 | Gemini (Google) | [aistudio.google.com](https://aistudio.google.com/apikey) | `gemini-2.5-pro` | |
-| OpenCode Zen | [opencode.ai/zen](https://opencode.ai/zen) | (목록에서 선택) | OpenAI 호환, Base URL `https://opencode.ai/zen/v1` |
-| 사용자 정의 (OpenAI 호환) | — | (직접 입력) | Ollama, LM Studio, vLLM 등 로컬 서버. 키 없어도 됨 |
+| OpenCode Zen | [opencode.ai/zen](https://opencode.ai/zen) | (⟳ 목록에서 선택, 필수) | OpenAI 호환, Base URL `https://opencode.ai/zen/v1`. 일부 모델은 chat/completions 를 지원하지 않을 수 있음 → 다른 모델 선택 |
+| 사용자 정의 (OpenAI 호환) | — | (⟳ 목록에서 선택, 필수) | Ollama, LM Studio, vLLM 등 로컬 서버. 키 없어도 됨 |
 
 ## 설정 화면에서 입력 (권장)
 
@@ -47,7 +47,7 @@ AI 를 쓰려면 프로바이더(AI 회사) 중 **하나 이상**의 API 키가 
 
 ## 상단바에서 모델 바꾸기
 
-상단바의 선택 상자에서 프로바이더를, 옆 입력란에서 모델 ID 를 바꿉니다. **⟳** 버튼으로 모델 목록을 불러와 고를 수 있습니다. 선택은 브라우저에 기억됩니다.
+상단바의 선택 상자에서 프로바이더를, 옆 입력란에서 모델 ID 를 바꿉니다. **⟳** 버튼으로 모델 목록을 불러와 고를 수 있습니다. 상단바 선택은 브라우저에 기억되며, 설정 화면의 기본 모델보다 **우선**합니다(설정값은 상단바에서 아직 고르지 않은 프로바이더의 초기값).
 
 ## 보안 메모
 

@@ -22,18 +22,21 @@ export function createGeminiProvider({ apiKey }) {
       let text = '';
       let finish = null;
       let usage = null;
+      let blocked = null;
       for await (const chunk of stream) {
-        const t = chunk.text;
+        let t = '';
+        try { t = chunk.text || ''; } catch { t = ''; }
         if (t) {
           text += t;
           onDelta?.(t);
         }
         const cand = chunk.candidates?.[0];
         if (cand?.finishReason) finish = cand.finishReason;
+        if (chunk.promptFeedback?.blockReason) blocked = chunk.promptFeedback.blockReason;
         if (chunk.usageMetadata)
           usage = { input: chunk.usageMetadata.promptTokenCount, output: chunk.usageMetadata.candidatesTokenCount };
       }
-      return { text, stopReason: finish, usage, model };
+      return { text, stopReason: mapFinish(finish, blocked), usage, model };
     } catch (err) {
       throw normalizeError(err);
     }
@@ -62,6 +65,15 @@ export function createGeminiProvider({ apiKey }) {
   }
 
   return { name: 'gemini', streamChat, listModels, ping };
+}
+
+/** Gemini finishReason/blockReason → 공통 stopReason */
+function mapFinish(finish, blocked) {
+  if (blocked) return 'refusal';
+  if (!finish || finish === 'STOP') return 'end_turn';
+  if (finish === 'MAX_TOKENS') return 'max_tokens';
+  if (['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII', 'RECITATION'].includes(finish)) return 'refusal';
+  return String(finish).toLowerCase();
 }
 
 function normalizeError(err) {

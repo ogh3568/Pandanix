@@ -147,7 +147,11 @@ export function streamPost(url, body, handlers = {}) {
   return () => ctrl.abort();
 }
 
+/** 업로드 가능 최대 크기 (서버 본문 80MB 제한, base64 팽창 고려) */
+export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
 export function fileToBase64(file) {
+  if (file.size > MAX_UPLOAD_BYTES) return Promise.reject(new Error(`${file.name}: 파일이 너무 큽니다 (최대 50MB).`));
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(String(r.result).split(',')[1]);

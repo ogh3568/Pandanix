@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { listWorkbooks, importWorkbookFromDir } from './lib/store.js';
-import { readJson, httpError } from './lib/paths.js';
+import { readJson, readJsonLenient, httpError, DIRS, listDirs } from './lib/paths.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const LIBRARY_DIR = path.join(__dirname, 'seed', 'library');
@@ -15,12 +15,13 @@ export function listLibrary() {
   const installed = new Map();
   for (const wb of listWorkbooks()) if (wb.libraryId) installed.set(wb.libraryId, wb.id);
   const out = [];
-  for (const slug of fs.readdirSync(LIBRARY_DIR).sort()) {
+  for (const slug of listDirs(LIBRARY_DIR).sort()) {
     const dir = path.join(LIBRARY_DIR, slug);
-    const wb = readJson(path.join(dir, 'workbook.json'), null);
+    const wb = readJsonLenient(path.join(dir, 'workbook.json'), null);
     if (!wb) continue;
     const problems = (wb.problemOrder || [])
-      .map((pid) => readJson(path.join(dir, 'problems', pid, 'problem.json'), null))
+      .filter((pid) => /^[A-Za-z0-9_-]{1,64}$/.test(String(pid)))
+      .map((pid) => readJsonLenient(path.join(dir, 'problems', pid, 'problem.json'), null))
       .filter(Boolean)
       .map((p) => ({ id: p.id, title: p.title }));
     out.push({
@@ -48,19 +49,27 @@ export function installLibraryWorkbook(slug, { force = false } = {}) {
   return importWorkbookFromDir(dir, { libraryId: slug, source: 'library' });
 }
 
-/** 첫 실행(문제집 0개)이면 내장 문제집을 모두 설치한다. */
+/**
+ * 첫 실행이면 내장 문제집을 모두 설치한다.
+ * "첫 실행" 판정은 data/.seeded 마커 파일로 한다 (사용자가 문제집을 전부 지운 뒤 재시작해도 다시 깔지 않도록).
+ */
 export function seedIfEmpty() {
-  try {
-    if (listWorkbooks().length > 0) return false;
-    let n = 0;
-    for (const lib of listLibrary()) {
-      installLibraryWorkbook(lib.id);
-      n++;
-    }
-    console.log(`[pandanix] 내장 문제집 ${n}개 설치`);
-    return true;
-  } catch (err) {
-    console.warn('[pandanix] 내장 문제집 설치 실패:', err.message);
+  const marker = path.join(DIRS.data, '.seeded');
+  if (fs.existsSync(marker)) return false;
+  if (listWorkbooks().length > 0) {
+    fs.writeFileSync(marker, new Date().toISOString());
     return false;
   }
+  let n = 0;
+  for (const lib of listLibrary()) {
+    try {
+      installLibraryWorkbook(lib.id);
+      n++;
+    } catch (err) {
+      console.warn(`[pandanix] 내장 문제집 설치 실패 (${lib.id}): ${err.message}`);
+    }
+  }
+  try { fs.writeFileSync(marker, new Date().toISOString()); } catch {}
+  console.log(`[pandanix] 내장 문제집 ${n}개 설치`);
+  return n > 0;
 }

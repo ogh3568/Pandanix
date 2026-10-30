@@ -1,6 +1,7 @@
 // 테스트용 OpenAI 호환 모의 서버. 실제 API 키 없이 스트리밍/생성 경로를 검증한다.
 // 사용: node tests/mock-openai-server.mjs [port]
 import http from 'node:http';
+import { pathToFileURL } from 'node:url';
 
 const port = Number(process.argv[2] || process.env.MOCK_PORT || 3999);
 
@@ -65,6 +66,6 @@ export function startMock(p = port) {
   return new Promise((resolve) => server.listen(p, '127.0.0.1', () => resolve(server)));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   startMock().then(() => console.log(`mock openai server on http://127.0.0.1:${port}/v1`));
 }

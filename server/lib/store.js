@@ -2,7 +2,7 @@
 // 폴더 구조는 docs/dev/data-model.md 참고.
 import fs from 'node:fs';
 import path from 'node:path';
-import { DIRS, readJson, writeJson, httpError, safeName, exists } from './paths.js';
+import { DIRS, readJson, readJsonLenient, writeJson, httpError, safeName, exists, isInside, listDirs, readTextSmart, IS_WINDOWS } from './paths.js';
 import { newId, nowIso } from './ids.js';
 
 /** 답안 저장본 보관 개수와 최소 간격 (자동 저장이 1.5초마다 와도 2분에 1개만 남긴다) */
@@ -30,21 +30,25 @@ function assertId(id) {
 
 // ---------- 문제집 ----------
 export function listWorkbooks() {
-  if (!exists(DIRS.workbooks)) return [];
   const out = [];
-  for (const name of fs.readdirSync(DIRS.workbooks)) {
+  for (const name of listDirs(DIRS.workbooks)) {
     const file = path.join(DIRS.workbooks, name, 'workbook.json');
-    const wb = readJson(file, null);
-    if (!wb) continue;
-    out.push(summarizeWorkbook(wb));
+    const wb = readJsonLenient(file, null); // 손상된 문제집 하나 때문에 전체 목록이 죽지 않게
+    if (!wb || !wb.id || !wb.title) continue;
+    try {
+      out.push(summarizeWorkbook(wb));
+    } catch (err) {
+      console.warn(`[pandanix] 문제집 요약 실패 (건너뜀): ${name} - ${err.message}`);
+    }
   }
   out.sort((a, b) => a.title.localeCompare(b.title, 'ko'));
   return out;
 }
 
 function summarizeWorkbook(wb) {
-  const problems = (wb.problemOrder || []).map((pId) => {
-    const p = readJson(problemFile(wb.id, pId), null);
+  const problems = [...new Set(wb.problemOrder || [])].map((pId) => {
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(pId))) return null;
+    const p = readJsonLenient(problemFile(wb.id, pId), null);
     return p ? { id: p.id, title: p.title, tags: p.tags || [] } : null;
   }).filter(Boolean);
   return { ...wb, problems };
@@ -56,16 +60,18 @@ export function getWorkbook(wbId) {
   return summarizeWorkbook(wb);
 }
 
+const str = (v) => (v === undefined || v === null ? '' : String(v));
+
 export function createWorkbook({ title, description = '', category = '', difficulty = '', source = 'manual', libraryId = null }) {
-  if (!title || !String(title).trim()) throw httpError(400, '문제집 제목은 필수입니다.');
+  if (!str(title).trim()) throw httpError(400, '문제집 제목은 필수입니다.');
   const id = newId('wb');
   const wb = {
     id,
-    title: String(title).trim(),
-    description,
-    category,
-    difficulty,
-    source,
+    title: str(title).trim(),
+    description: str(description),
+    category: str(category),
+    difficulty: str(difficulty),
+    source: str(source) || 'manual',
     libraryId: libraryId || undefined,
     createdAt: nowIso(),
     updatedAt: nowIso(),
@@ -79,10 +85,11 @@ export function createWorkbook({ title, description = '', category = '', difficu
 export function updateWorkbook(wbId, patch) {
   const wb = readJson(wbFile(wbId), null);
   if (!wb) throw httpError(404, '문제집을 찾을 수 없습니다.');
-  for (const k of ['title', 'description', 'category', 'difficulty']) if (k in patch) wb[k] = patch[k];
+  for (const k of ['title', 'description', 'category', 'difficulty']) if (k in patch) wb[k] = str(patch[k]).trim();
+  if (!wb.title) throw httpError(400, '문제집 제목은 비울 수 없습니다.');
   if (Array.isArray(patch.problemOrder)) {
     const existing = new Set(wb.problemOrder);
-    wb.problemOrder = patch.problemOrder.filter((id) => existing.has(id));
+    wb.problemOrder = [...new Set(patch.problemOrder.filter((id) => existing.has(id)))];
     for (const id of existing) if (!wb.problemOrder.includes(id)) wb.problemOrder.push(id);
   }
   wb.updatedAt = nowIso();
@@ -111,12 +118,12 @@ const PROBLEM_FIELDS = ['title', 'prompt', 'submission', 'hints', 'rubric', 'tag
 export function createProblem(wbId, data) {
   const wb = readJson(wbFile(wbId), null);
   if (!wb) throw httpError(404, '문제집을 찾을 수 없습니다.');
-  if (!data.title || !String(data.title).trim()) throw httpError(400, '문제 제목은 필수입니다.');
+  if (!str(data.title).trim()) throw httpError(400, '문제 제목은 필수입니다.');
   const id = newId('p');
   const p = {
     id,
-    title: String(data.title).trim(),
-    prompt: data.prompt || '',
+    title: str(data.title).trim(),
+    prompt: str(data.prompt),
     submission: normalizeSubmission(data.submission),
     hints: Array.isArray(data.hints) ? data.hints : [],
     rubric: Array.isArray(data.rubric) ? data.rubric : [],
@@ -140,8 +147,11 @@ export function updateProblem(wbId, pId, patch) {
   if (!p) throw httpError(404, '문제를 찾을 수 없습니다.');
   for (const k of PROBLEM_FIELDS) {
     if (!(k in patch)) continue;
-    p[k] = k === 'submission' ? normalizeSubmission(patch[k]) : patch[k];
+    if (k === 'submission') p[k] = normalizeSubmission(patch[k]);
+    else if (k === 'title' || k === 'prompt' || k === 'difficulty') p[k] = str(patch[k]).trim();
+    else p[k] = patch[k];
   }
+  if (!p.title) throw httpError(400, '문제 제목은 비울 수 없습니다.');
   if (Array.isArray(patch.references)) {
     // 설명(description) 수정만 허용. 파일 자체는 별도 API 로 관리
     const byFile = new Map(patch.references.map((r) => [r.file, r]));
@@ -241,7 +251,7 @@ export function readReferencesAsText(wbId, pId, maxChars = 120000) {
       parts.push(`### ${r.name} (${r.file})\n[텍스트가 아닌 파일 - 내용 생략. 설명: ${r.description || '없음'}]`);
       continue;
     }
-    let content = fs.readFileSync(referencePath(wbId, pId, r.file), 'utf8');
+    let content = readTextSmart(referencePath(wbId, pId, r.file));
     const remain = maxChars - used;
     if (remain <= 0) {
       parts.push(`### ${r.name}\n[길이 제한으로 생략]`);
@@ -261,12 +271,20 @@ export function getAnswer(wbId, pId) {
   return a;
 }
 
+/** 문제가 실제로 있는지 (고아 답안/채팅 생성 방지). 일반 채팅(general) 은 예외. */
+export function assertProblemExists(wbId, pId) {
+  if (wbId === 'general' && pId === 'general') return;
+  if (!exists(problemFile(wbId, pId))) throw httpError(404, `문제를 찾을 수 없습니다: ${wbId}/${pId}`);
+}
+
 export function saveAnswer(wbId, pId, { html, status }) {
+  assertProblemExists(wbId, pId);
   const prev = readJson(answerFile(wbId, pId), null) || {};
+  const nextStatus = ['draft', 'done'].includes(status) ? status : prev.status || 'draft';
   const next = {
     ...prev,
     html: typeof html === 'string' ? html : prev.html || '',
-    status: status || prev.status || 'draft',
+    status: nextStatus,
     updatedAt: nowIso(),
   };
   writeJson(answerFile(wbId, pId), next);
@@ -289,12 +307,9 @@ export function saveAnswer(wbId, pId, { html, status }) {
 
 export function answerStatusMap() {
   const out = {};
-  if (!exists(DIRS.answers)) return out;
-  for (const wb of fs.readdirSync(DIRS.answers)) {
-    const wbPath = path.join(DIRS.answers, wb);
-    if (!fs.statSync(wbPath).isDirectory()) continue;
-    for (const p of fs.readdirSync(wbPath)) {
-      const a = readJson(path.join(wbPath, p, 'answer.json'), null);
+  for (const wb of listDirs(DIRS.answers)) {
+    for (const p of listDirs(path.join(DIRS.answers, wb))) {
+      const a = readJsonLenient(path.join(DIRS.answers, wb, p, 'answer.json'), null);
       if (!a) continue;
       (out[wb] ||= {})[p] = a.status || 'draft';
     }
@@ -324,6 +339,7 @@ function listAttachments(wbId, pId) {
 }
 
 export function addAttachment(wbId, pId, fileName, buffer) {
+  assertProblemExists(wbId, pId);
   const dir = attachmentsDir(wbId, pId);
   fs.mkdirSync(dir, { recursive: true });
   let file = safeName(fileName, 'attachment');
@@ -355,6 +371,7 @@ export function saveChat(wbId, pId, chat) {
 }
 
 export function appendChat(wbId, pId, message) {
+  assertProblemExists(wbId, pId);
   const chat = getChat(wbId, pId);
   chat.messages.push({ ...message, ts: nowIso() });
   saveChat(wbId, pId, chat);
@@ -371,20 +388,37 @@ export function importWorkbookFromDir(srcDir, { libraryId = null, source = 'impo
   const src = readJson(path.join(srcDir, 'workbook.json'), null);
   if (!src) throw httpError(400, '선택한 폴더에 workbook.json 이 없습니다.');
   const wb = createWorkbook({ ...src, source, libraryId });
-  for (const pId of src.problemOrder || []) {
-    const pSrc = readJson(path.join(srcDir, 'problems', pId, 'problem.json'), null);
-    if (!pSrc) continue;
-    const p = createProblem(wb.id, pSrc);
-    const refSrc = path.join(srcDir, 'problems', pId, 'references');
-    if (exists(refSrc)) {
+  try {
+    for (const rawPid of [...new Set(src.problemOrder || [])]) {
+      // 폴더 안의 JSON 은 신뢰하지 않는다: ID 규칙 검사 + 최종 경로가 srcDir 안인지 확인
+      const pId = String(rawPid);
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(pId)) throw httpError(400, `잘못된 문제 ID: ${pId}`);
+      const pDir = path.join(srcDir, 'problems', pId);
+      if (!isInside(srcDir, pDir)) throw httpError(400, '문제 경로가 폴더 밖을 가리킵니다.');
+      const pSrc = readJson(path.join(pDir, 'problem.json'), null);
+      if (!pSrc) continue;
+      const p = createProblem(wb.id, pSrc);
+      const refSrc = path.join(pDir, 'references');
+      if (!exists(refSrc) || !fs.statSync(refSrc).isDirectory()) continue;
+      const onDisk = fs.readdirSync(refSrc, { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name);
+      const eq = (a, b) => (IS_WINDOWS ? a.toLowerCase() === b.toLowerCase() : a === b);
+      const declared = (pSrc.references || [])
+        .map((r) => (r && typeof r.file === 'string' ? r.file : ''))
+        .filter((f) => f && f === path.basename(f) && safeName(f) === f && onDisk.some((d) => eq(d, f)))
+        .map((f) => onDisk.find((d) => eq(d, f)));
       // problem.json 에 적힌 순서를 우선하고, 목록에 없는 파일은 뒤에 붙인다
-      const declared = (pSrc.references || []).map((r) => r.file);
-      const files = [...declared.filter((f) => exists(path.join(refSrc, f))), ...fs.readdirSync(refSrc).filter((f) => !declared.includes(f))];
+      const files = [...new Set([...declared, ...onDisk])];
       for (const f of files) {
-        const meta = (pSrc.references || []).find((r) => r.file === f) || {};
-        addReferenceFile(wb.id, p.id, { fileName: f, buffer: fs.readFileSync(path.join(refSrc, f)), description: meta.description, name: meta.name });
+        const full = path.join(refSrc, f);
+        if (!isInside(refSrc, full)) continue;
+        const meta = (pSrc.references || []).find((r) => r && eq(String(r.file), f)) || {};
+        addReferenceFile(wb.id, p.id, { fileName: f, buffer: fs.readFileSync(full), description: meta.description, name: meta.name });
       }
     }
+  } catch (err) {
+    // 실패하면 반쯤 만들어진 문제집을 남기지 않는다
+    try { deleteWorkbook(wb.id); } catch {}
+    throw err;
   }
   return getWorkbook(wb.id);
 }
@@ -392,6 +426,7 @@ export function importWorkbookFromDir(srcDir, { libraryId = null, source = 'impo
 export function exportWorkbookToDir(wbId, destDir) {
   const src = wbDir(wbId);
   if (!exists(src)) throw httpError(404, '문제집을 찾을 수 없습니다.');
+  if (isInside(destDir, src)) throw httpError(400, '내보내기 대상이 원본 폴더를 포함합니다.');
   fs.mkdirSync(destDir, { recursive: true });
   fs.cpSync(src, destDir, { recursive: true });
   return destDir;

@@ -19,6 +19,7 @@ generateRouter.post(
     const body = req.body || {};
     if (!body.topic || !String(body.topic).trim()) throw httpError(400, '주제를 입력하세요.');
     const count = Math.min(Math.max(Number(body.count) || 3, 1), 10);
+    if (body.workbookId) store.getWorkbook(String(body.workbookId)); // 없는 문제집이면 토큰 쓰기 전에 404
     const { provider, model } = resolveProviderAndModel(body.provider, body.model);
     const providerImpl = getProvider(provider);
     const { system, user } = buildWorkbookGenerationPrompt({ ...body, count });
@@ -44,6 +45,7 @@ generateRouter.post(
         abort.signal,
       );
       if (result.stopReason === 'refusal') throw new Error('모델이 생성을 거부했습니다. 주제를 바꿔 보세요.');
+      if (result.stopReason === 'max_tokens' || result.stopReason === 'length') throw new Error(`출력 길이 제한(${32000} 토큰)에 걸려 생성이 끊겼습니다. 문제 수를 줄이거나 참고자료 분량을 줄이도록 "추가 요구사항" 에 적어 보세요.`);
       const data = extractJson(result.text);
       const wb = saveGenerated(data, body.workbookId, { provider, model });
       sse.send('done', { workbook: wb, chars });

@@ -41,3 +41,27 @@ test('safeName 은 경로 구분자를 제거', () => {
   assert.equal(safeName('../a/b\\c:d.txt'), '_a_b_c_d.txt');
   assert.equal(safeName(''), 'file');
 });
+
+test('htmlToMarkdown: pre 안 태그 보존, 이중 엔티티 1회 디코드, 중첩 목록, 숫자 엔티티', () => {
+  const md = htmlToMarkdown('<pre>&lt;div&gt;</pre><p>&amp;lt;tag&amp;gt;</p><ul><li>a<ul><li>b</li></ul></li><li>c</li></ul><p>&#8361;100</p>');
+  assert.match(md, /```\n<div>\n```/);
+  assert.match(md, /&lt;tag&gt;/);
+  assert.match(md, /- a\n  - b\n- c/);
+  assert.match(md, /₩100/);
+});
+
+test('htmlToText 는 사용자 문자(_ # * >)를 보존한다', () => {
+  assert.equal(htmlToText('<p>file_name C# a &gt; b 2*3=6</p>'), 'file_name C# a > b 2*3=6');
+});
+
+test('extractJson: 산문 속 중괄호, 문자열 안 개행, 잘린 출력', () => {
+  assert.deepEqual(extractJson('설명 {참고} 입니다. ```json\n{"a":"줄1\n줄2",}\n``` 끝'), { a: '줄1\n줄2' });
+  assert.throws(() => extractJson('{"a": 1, "b": {"c"'), /끊겼습니다/);
+});
+
+test('safeName: 멱등, Windows 예약 이름·끝 점 처리', () => {
+  assert.equal(safeName(safeName(' .env')), safeName(' .env'));
+  assert.equal(safeName('CON.txt'), '_CON.txt');
+  assert.equal(safeName('trail. '), 'trail');
+  assert.ok(Buffer.byteLength(safeName('가'.repeat(300) + '.md')) <= 200);
+});

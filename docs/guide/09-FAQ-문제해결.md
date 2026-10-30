@@ -20,7 +20,7 @@
 → 🩺 Doctor → 실시간 API 테스트. 메시지별 조치는 [5장 오류 표](05-AI-채팅.md#오류-메시지-읽기).
 
 **회사 프록시 환경이에요**
-→ `HTTPS_PROXY` 환경변수를 설정하고 실행하세요. Node 의 공식 SDK 들은 이 변수를 따릅니다. 안 되면 IT 부서에 `api.anthropic.com`, `api.openai.com`, `generativelanguage.googleapis.com` 허용 요청.
+→ `HTTPS_PROXY`(필요하면 `NO_PROXY`) 환경변수를 설정하고 `start.bat` 으로 실행하세요. 배치 파일이 `NODE_USE_ENV_PROXY=1` 을 함께 켜서 Node(22.21 이상)가 그 프록시를 사용합니다. 터미널에서 직접 실행할 때는 `set NODE_USE_ENV_PROXY=1` 을 먼저 하세요. 그래도 안 되면 IT 부서에 `api.anthropic.com`, `api.openai.com`, `generativelanguage.googleapis.com`, `opencode.ai` 허용 요청.
 
 **모델 목록(⟳)이 비어 있어요**
 → 키가 없거나 권한이 없는 경우. 모델 ID 를 직접 입력해도 됩니다.
@@ -34,15 +34,18 @@
 ## 데이터
 
 **답안이 사라졌어요**
-→ 에디터 🕘 버튼으로 최근 20개 저장본 복원. 파일은 `data/answers/<문제집>/<문제>/history/`.
+→ 에디터 🕘 버튼으로 저장본(2분 간격, 최근 20개) 복원. 파일은 `data/answers/<문제집>/<문제>/history/`.
 
 **문제집을 다른 PC 로 옮기려면**
 → ⋯ → 폴더로 내보내기 → 폴더 복사 → 📥 가져오기. 또는 `data/` 전체 복사.
 
-**샘플 문제집을 지웠는데 다시 보고 싶어요**
+**내장 문제집을 지웠는데 다시 보고 싶어요**
 → 왼쪽 **📚 내장 문제집** 에서 다시 설치하세요. 모든 내장 문제집이 여기에 있습니다.
 
 ## 보안
 
-**API 키는 어디에 저장되나요** → `data/config/credentials.json`. git 제외, UI 마스킹.
-**파일 접근 범위는** → 설정에서 허용한 폴더와 `data/` 만. 그 밖은 403.
+**API 키는 어디에 저장되나요**
+→ `data/config/credentials.json`. git 제외, UI 에는 마스킹되어 표시.
+
+**파일 접근 범위는 어디까지인가요**
+→ 설정에서 허용한 폴더와 `data/` 만. 그 밖은 403 으로 거부됩니다.

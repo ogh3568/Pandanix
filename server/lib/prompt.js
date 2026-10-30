@@ -93,19 +93,77 @@ ${audience ? `대상 학습자: ${audience}\n` : ''}${extra ? `추가 요구사�
   return { system, user };
 }
 
-/** 모델 출력에서 JSON 객체를 최대한 안전하게 뽑아낸다. */
+/**
+ * 모델 출력에서 JSON 객체를 최대한 안전하게 뽑아낸다.
+ * 순서: ```json 펜스 블록 → 괄호 균형을 맞춘 첫 번째 객체 → 후행 콤마·문자열 안 개행 보정.
+ */
 export function extractJson(text) {
-  let s = String(text || '').trim();
-  s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
-  const start = s.indexOf('{');
-  const end = s.lastIndexOf('}');
-  if (start < 0 || end < 0) throw new Error('응답에서 JSON 을 찾지 못했습니다.');
-  const candidate = s.slice(start, end + 1);
-  try {
-    return JSON.parse(candidate);
-  } catch (e) {
-    // 흔한 오류 보정: 후행 콤마
-    const fixed = candidate.replace(/,\s*([}\]])/g, '$1');
-    return JSON.parse(fixed);
+  const raw = String(text || '');
+  const candidates = [];
+  for (const m of raw.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)) candidates.push(m[1]);
+  const balanced = findBalancedObject(raw);
+  if (balanced) candidates.push(balanced);
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start >= 0 && end > start) candidates.push(raw.slice(start, end + 1));
+  let lastErr = null;
+  for (const c of candidates) {
+    for (const variant of [c, c.replace(/,\s*([}\]])/g, '$1'), fixNewlinesInStrings(c.replace(/,\s*([}\]])/g, '$1'))]) {
+      try {
+        const v = JSON.parse(variant.trim());
+        if (v && typeof v === 'object') return v;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
   }
+  if (start < 0) throw new Error('응답에서 JSON 을 찾지 못했습니다. 모델이 설명문만 출력했을 수 있습니다.');
+  if (end < 0 || !balanced) throw new Error('JSON 이 중간에 끊겼습니다. 출력 길이 제한에 걸렸을 수 있으니 문제 수를 줄이거나 다른 모델로 시도하세요.');
+  throw new Error(`JSON 해석 실패: ${lastErr?.message || '형식 오류'}`);
+}
+
+/** 첫 '{' 부터 괄호 균형이 맞는 지점까지 (문자열 안의 괄호는 무시) */
+function findBalancedObject(s) {
+  const start = s.indexOf('{');
+  if (start < 0) return null;
+  let depth = 0;
+  let inStr = false;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (c === '\\') i++;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      if (depth === 0) return s.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/** 문자열 리터럴 안의 생(raw) 줄바꿈을 \\n 으로 바꾼다 */
+function fixNewlinesInStrings(s) {
+  let out = '';
+  let inStr = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (c === '\\') {
+        out += c + (s[i + 1] ?? '');
+        i++;
+        continue;
+      }
+      if (c === '"') inStr = false;
+      else if (c === '\n') {
+        out += '\\n';
+        continue;
+      }
+    } else if (c === '"') inStr = true;
+    out += c;
+  }
+  return out;
 }
