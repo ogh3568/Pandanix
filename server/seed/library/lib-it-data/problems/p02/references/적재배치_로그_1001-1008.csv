@@ -1,0 +1,13 @@
+run_id,target_date,run_at,job_name,source_rows,loaded_rows,rejected_rows,duration_sec,status,note
+R1001,2026-10-01,2026-10-02 01:00,orders_daily,18452,18452,0,312,SUCCESS,
+R1002,2026-10-02,2026-10-03 01:00,orders_daily,17980,17980,0,298,SUCCESS,
+R1003,2026-10-03,2026-10-04 01:00,orders_daily,21304,21304,0,355,SUCCESS,
+R1004,2026-10-04,2026-10-05 01:00,orders_daily,20117,20117,0,341,SUCCESS,
+R1005,2026-10-05,2026-10-06 01:00,orders_daily,19876,19861,15,330,SUCCESS,unit_price 비숫자 15건 reject
+R1006,2026-10-06,2026-10-07 01:00,orders_daily,22410,22410,0,368,SUCCESS,
+R1007,2026-10-07,2026-10-08 01:00,orders_daily,22198,3980,0,1800,FAILED,OMS 응답 타임아웃(30분) - 부분 커밋 상태로 중단
+R1008,2026-10-07,2026-10-08 03:40,orders_daily,22198,22198,0,372,SUCCESS,수동 재실행(야간 당직) - 사전 삭제 단계 생략
+R1009,2026-10-08,2026-10-09 01:00,orders_daily,19544,19544,0,326,SUCCESS,
+R1010,2026-10-08,2026-10-09 01:30,customer_dim,4210,4210,0,45,SUCCESS,고객 차원 테이블(주문과 별도)
+
+※ target_date = 적재 대상 주문일, run_at = 실제 실행 시각. 원천 행 수는 OMS 기준.

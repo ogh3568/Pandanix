@@ -43,7 +43,7 @@ for (const slug of fs.readdirSync(LIBRARY_DIR).sort()) {
         const size = fs.statSync(path.join(refDir, r.file)).size;
         if (size < 200) fail(`${pid}: 참고자료 너무 작음 ${r.file} (${size}B)`);
         if (/\.csv$/i.test(r.file)) {
-          const lines = fs.readFileSync(path.join(refDir, r.file), 'utf8').trim().split(/\r?\n/);
+          const lines = fs.readFileSync(path.join(refDir, r.file), 'utf8').trim().split(/\r?\n/).filter((l) => l.trim() && !/^\s*[※#]/.test(l));
           const cols = lines[0].split(',').length;
           const bad = lines.findIndex((l) => l.split(',').length !== cols && !/"/.test(l));
           if (bad > 0) fail(`${pid}: CSV 열 수 불일치 ${r.file} ${bad + 1}행`);

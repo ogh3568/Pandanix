@@ -1,6 +1,6 @@
 {
   "name": "pandanix",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI 활용 연습 웹 애플리케이션 (Windows 로컬 실행)",
   "type": "module",
   "main": "server.js",

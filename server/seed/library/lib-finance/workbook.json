@@ -1,0 +1,13 @@
+{
+  "id": "lib-finance",
+  "title": "재무·회계: 예산과 비용 분석 보고",
+  "description": "예산 집행 현황, 비용 절감안, 투자안 비교처럼 숫자로 판단해야 하는 재무 업무를 연습합니다. AI 에게 CSV 집계와 계산을 맡기되, 계산 과정을 확인하고 해석과 권고는 직접 다듬어 보세요.",
+  "category": "재무·회계",
+  "difficulty": "중급",
+  "source": "library",
+  "problemOrder": [
+    "p01",
+    "p02",
+    "p03"
+  ]
+}

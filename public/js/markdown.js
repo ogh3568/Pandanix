@@ -132,13 +132,18 @@ function renderList(items, ordered) {
 }
 
 /** CSV 텍스트 → HTML 표 (참고자료 미리보기용) */
+/** CSV 텍스트 → HTML 표. "※" 또는 "#" 로 시작하는 줄은 각주로 표 아래에 표시한다. */
 export function renderCsv(text, maxRows = 200) {
-  const rows = String(text).replace(/\r/g, '').split('\n').filter((l) => l.trim()).slice(0, maxRows).map(parseCsvLine);
+  const lines = String(text).replace(/\r/g, '').split('\n').filter((l) => l.trim());
+  const notes = lines.filter((l) => /^\s*[※#]/.test(l)).map((l) => l.replace(/^\s*[※#]\s*/, ''));
+  const rows = lines.filter((l) => !/^\s*[※#]/.test(l)).slice(0, maxRows).map(parseCsvLine);
   if (!rows.length) return '';
   const [h, ...body] = rows;
-  return `<table><thead><tr>${h.map((c) => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${body
+  const table = `<table><thead><tr>${h.map((c) => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${body
     .map((r) => `<tr>${h.map((_, k) => `<td>${escapeHtml(r[k] ?? '')}</td>`).join('')}</tr>`)
     .join('')}</tbody></table>`;
+  const noteHtml = notes.length ? `<ul class="csv-notes">${notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul>` : '';
+  return table + noteHtml;
 }
 
 function parseCsvLine(line) {
