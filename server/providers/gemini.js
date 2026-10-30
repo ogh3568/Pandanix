@@ -2,7 +2,7 @@
 import { GoogleGenAI } from '@google/genai';
 
 export function createGeminiProvider({ apiKey }) {
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 20 * 60 * 1000 } });
 
   async function streamChat({ model, system, messages, maxTokens = 16000 }, onDelta, signal) {
     const contents = messages.map((m) => ({

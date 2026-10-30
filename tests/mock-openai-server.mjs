@@ -42,6 +42,13 @@ export function startMock(p = port) {
         }
         const sys = j.messages.find((m) => m.role === 'system')?.content || '';
         const last = j.messages[j.messages.length - 1].content;
+        if (/STALL/.test(last)) {
+          // 무응답 시뮬레이션: 헤더만 보내고 아무것도 보내지 않는다 (클라이언트가 끊을 때까지)
+          res.setHeader('content-type', 'text/event-stream');
+          res.write(': open\n\n');
+          res.on('close', () => res.end()); // req 'close' 는 본문 수신 직후 발생하므로 res 쪽을 본다
+          return;
+        }
         const text = /JSON 스키마/.test(sys) ? JSON.stringify(WORKBOOK_JSON) : `ECHO: ${last}\n\n| 항목 | 값 |\n|---|---|\n| 시스템길이 | ${sys.length} |\n| 참고자료포함 | ${/## 참고자료/.test(sys)} |\n| 답안포함 | ${/현재 답안 초안/.test(sys)} |`;
         res.setHeader('content-type', 'text/event-stream');
         const chunks = text.match(/[\s\S]{1,40}/g) || [];

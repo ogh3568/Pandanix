@@ -15,14 +15,16 @@ data/
       references/<file>       참고자료 원본 파일
   answers/<wbId>/<pId>/
     answer.json                { html, status, updatedAt }
-    history/<timestamp>.html   저장본 최근 20개
+    history/<timestamp>.html   저장본 (2분 간격으로 1개, 최근 20개 - store.js HISTORY_KEEP/HISTORY_MIN_GAP_MS)
     attachments/<file>         이미지/첨부
     chat.json                  { messages:[...], updatedAt }
   answers/general/general/chat.json   "일반 채팅" 기록
   tmp/                         doctor 쓰기 테스트 등
 ```
 
-ID 규칙: `wb_` / `p_` + 8자리 hex (`server/lib/ids.js`). 정규식 `^[A-Za-z0-9_-]{1,64}$` 를 통과해야 경로에 쓰인다. 샘플/가져오기 시에는 새 ID 가 발급된다.
+ID 규칙: `wb_` / `p_` + 8자리 hex (`server/lib/ids.js`). 정규식 `^[A-Za-z0-9_-]{1,64}$` 를 통과해야 경로에 쓰인다. 내장 문제집 설치/가져오기 시에는 새 ID 가 발급된다.
+
+그 밖의 파일: `data/.seeded`(첫 실행 시드 완료 마커), `data/logs/pandanix.log`(서버 로그, 5MB 회전).
 
 ## settings.json
 ```jsonc
@@ -31,7 +33,7 @@ ID 규칙: `wb_` / `p_` + 8자리 hex (`server/lib/ids.js`). 정규식 `^[A-Za-z
   "defaultProvider": "anthropic",
   "models": { "anthropic": "claude-opus-5-5", "openai": "gpt-5", "gemini": "gemini-2.5-pro", "opencode": "", "custom": "" },
   "allowedRoots": ["C:\\Users\\me\\Documents"],   // DATA_DIR 는 자동 포함
-  "chat": { "maxOutputTokens": 16000, "includeProblem": true, "includeReferences": true, "includeAnswer": false, "maxReferenceChars": 120000 },
+  "chat": { "maxOutputTokens": 32000, "includeProblem": true, "includeReferences": true, "includeAnswer": false, "maxReferenceChars": 120000 },  // include* 는 채팅 체크박스 초기값이자 API 직접 호출 시 기본값
   "anthropic": { "fallbacks": true },             // Claude 5 세대 서버측 대체 모델
   "editor": { "autosaveMs": 1500 }
 }
@@ -58,7 +60,8 @@ ID 규칙: `wb_` / `p_` + 8자리 hex (`server/lib/ids.js`). 정규식 `^[A-Za-z
   "description": "…",
   "category": "업무 일반",
   "difficulty": "초급",          // 초급|중급|고급|""
-  "source": "manual|ai|import|sample",
+  "source": "manual | ai | import | library",
+  "libraryId": "lib-basics",      // 내장 문제집에서 설치한 경우만. 라이브러리 화면의 "설치됨" 판정에 사용
   "createdAt": "ISO", "updatedAt": "ISO",
   "problemOrder": ["p_a2ab51a1", "p_…"]   // 표시 순서. 실제 문제는 problems/ 폴더
 }
@@ -96,7 +99,7 @@ API 응답의 `references[]` 에는 파일 시스템에서 계산한 `size, ext,
       "error": true /*선택*/, "aborted": true /*선택*/ }
   ], "updatedAt": "ISO" }
 ```
-채팅 요청 시 서버는 `role` 이 user/assistant 인 최근 30개만 모델에 보낸다(오류 메시지도 assistant 로 저장되므로 필요하면 필터 추가).
+채팅 요청 시 서버는 `role` 이 user/assistant 이고 `error`/`aborted` 가 아닌, 내용이 있는 최근 30개만 모델에 보낸다. 중단된 응답은 받은 부분 + "(사용자가 중단함)" 으로 `aborted:true` 저장.
 
 ## 가져오기/내보내기 형식
 문제집 폴더 그대로(`workbook.json` + `problems/<id>/problem.json` + `references/`). 가져올 때 ID 는 새로 발급되고 `references[]` 순서를 유지한다. 예시: `server/seed/library/lib-basics/`. 설치된 내장 문제집은 `workbook.json` 에 `libraryId` 가 기록되어 라이브러리 화면에서 "설치됨" 으로 표시된다.

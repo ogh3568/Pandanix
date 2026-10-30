@@ -5,6 +5,7 @@ import { getProvider, resolveProviderAndModel } from '../providers/index.js';
 import { openSse } from '../lib/sse.js';
 import { wrap } from '../lib/async.js';
 import { httpError } from '../lib/paths.js';
+import { createStallWatchdog } from '../lib/watchdog.js';
 
 export const generateRouter = Router();
 
@@ -32,11 +33,14 @@ generateRouter.post(
 
     let chars = 0;
     let lastSent = 0;
+    let stallMessage = null;
+    const watchdog = createStallWatchdog(abort, (msg) => { stallMessage = msg; });
     try {
       const result = await providerImpl.streamChat(
         { model, system, messages: [{ role: 'user', content: user }], maxTokens: 32000 },
         (delta) => {
           chars += delta.length;
+          watchdog.touch();
           if (chars - lastSent > 200) {
             lastSent = chars;
             sse.send('progress', { chars });
@@ -44,13 +48,16 @@ generateRouter.post(
         },
         abort.signal,
       );
+      watchdog.stop();
+      if (stallMessage) throw new Error(stallMessage);
       if (result.stopReason === 'refusal') throw new Error('모델이 생성을 거부했습니다. 주제를 바꿔 보세요.');
       if (result.stopReason === 'max_tokens' || result.stopReason === 'length') throw new Error(`출력 길이 제한(${32000} 토큰)에 걸려 생성이 끊겼습니다. 문제 수를 줄이거나 참고자료 분량을 줄이도록 "추가 요구사항" 에 적어 보세요.`);
       const data = extractJson(result.text);
       const wb = saveGenerated(data, body.workbookId, { provider, model });
       sse.send('done', { workbook: wb, chars });
     } catch (err) {
-      if (!abort.signal.aborted) sse.send('error', { error: err.message || String(err) });
+      watchdog.stop();
+      if (stallMessage || !abort.signal.aborted) sse.send('error', { error: stallMessage || err.message || String(err) });
     } finally {
       sse.close();
     }

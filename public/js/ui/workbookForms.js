@@ -74,6 +74,10 @@ export function problemForm(wbId, existing = null) {
               toast('제목을 입력하세요.', 'error');
               return false;
             }
+            if (v.charLimit && (!/^\d+$/.test(v.charLimit.trim()) || Number(v.charLimit) < 0)) {
+              toast('글자 수 제한은 0 이상의 정수로 입력하세요. (비우면 제한 없음)', 'error');
+              return false;
+            }
             const splitLines = (s) => s.split('\n').map((x) => x.trim()).filter(Boolean);
             const splitComma = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
             const data = {
@@ -123,6 +127,10 @@ export function aiGenerateDialog({ workbookId = null } = {}) {
               toast('주제를 입력하세요.', 'error');
               return false;
             }
+            if (!(Number(v.count) >= 1 && Number(v.count) <= 10)) {
+              toast('문제 수는 1~10 사이로 입력하세요.', 'error');
+              return false;
+            }
             const prog = c.body.querySelector('[data-progress]');
             const btns = c.foot.querySelectorAll('button');
             btns[1].disabled = true;
@@ -134,7 +142,7 @@ export function aiGenerateDialog({ workbookId = null } = {}) {
                 meta: (m) => (prog.textContent = `${m.provider}/${m.model} 로 생성 중…`),
                 progress: (p) => (prog.textContent = `생성 중… ${p.chars.toLocaleString()}자 수신`),
                 done: (d) => {
-                  toast(`문제집 생성 완료: ${d.workbook.title}`, 'ok');
+                  if (!workbookId) toast(`문제집 생성 완료: ${d.workbook.title}`, 'ok');
                   resolve(d.workbook);
                   c.close();
                 },

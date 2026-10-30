@@ -32,12 +32,16 @@
     const { files } = await (await fetch('/api/docs')).json();
     const groups = {};
     for (const f of files) (groups[f.group] ||= []).push(f);
-    nav.innerHTML = Object.entries(groups).map(([g, fs]) => `<h3>${g}</h3>${fs.map((f) => `<a href="#${f.path}" data-path="${f.path}">${f.title}</a>`).join('')}`).join('');
+    // 개발 문서는 접어 둔다 (최종 사용자에게는 사용 가이드만 먼저 보이도록)
+    nav.innerHTML = Object.entries(groups).map(([g, fs]) => {
+      const links = fs.map((f) => `<a href="#${f.path}" data-path="${f.path}">${f.title}</a>`).join('');
+      return g === '개발/유지보수' ? `<details><summary style="cursor:pointer;font-size:12px;color:var(--muted);text-transform:uppercase;margin:14px 0 4px">${g}</summary>${links}</details>` : `<h3>${g}</h3>${links}`;
+    }).join('');
     async function show() {
       const raw = decodeURIComponent(location.hash.slice(1));
       const [path, anchor] = (raw || files[0]?.path || '').split('#');
       if (!path) return;
-      nav.querySelectorAll('a').forEach((a) => a.classList.toggle('active', a.dataset.path === path));
+      nav.querySelectorAll('a').forEach((a) => { const on = a.dataset.path === path; a.classList.toggle('active', on); if (on) a.closest('details')?.setAttribute('open', ''); });
       const res = await fetch('/docs/' + path);
       let md = await res.text();
       // 상대 링크를 뷰어 해시 링크로 변환

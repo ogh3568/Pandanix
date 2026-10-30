@@ -2,7 +2,7 @@
 import { api, fileToBase64 } from '../api.js';
 import { state, emit, on, prefs } from '../state.js';
 import { renderMarkdown, renderCsv, escapeHtml } from '../markdown.js';
-import { toast, confirmDialog, openModal } from './modal.js';
+import { toast, confirmDialog, openModal, openMenu } from './modal.js';
 import { workbookForm, problemForm, aiGenerateDialog, newTextReferenceDialog, refreshWorkbooks, libraryDialog } from './workbookForms.js';
 import { pickPath } from './filepicker.js';
 
@@ -17,6 +17,13 @@ export function initSidebar(el) {
   on('problem:changed', () => renderProblem());
   on('answer:saved', ({ wb, p, status }) => {
     (statusMap[wb] ||= {})[p] = status;
+  });
+  // 키보드 접근성: tabindex 요소에서 Enter/Space 는 클릭과 같다
+  root.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[tabindex="0"]')) {
+      e.preventDefault();
+      e.target.click();
+    }
   });
   renderList();
 }
@@ -58,7 +65,8 @@ async function renderList() {
     if (!wb) return;
     await refreshWorkbooks();
     expanded.add(wb.id);
-    renderList();
+    if (wb.problems[0]) selectProblem(wb.id, wb.problems[0].id);
+    else renderList();
   };
   root.querySelector('[data-act="library"]').onclick = async () => {
     const wb = await libraryDialog();
@@ -69,6 +77,9 @@ async function renderList() {
     const dir = await pickPath({ mode: 'dir', title: '문제집 폴더 선택 (workbook.json 포함)' });
     if (!dir) return;
     try {
+      const folderName = dir.split(/[\\/]/).filter(Boolean).pop();
+      const dup = state.workbooks.find((w) => w.title === folderName);
+      if (dup && !(await confirmDialog(`같은 제목의 문제집("${dup.title}")이 이미 있습니다. 복사본으로 가져올까요?`, { okLabel: '복사본 추가' }))) return;
       const wb = await api.importWorkbook(dir);
       await refreshWorkbooks();
       expanded.add(wb.id);
@@ -105,7 +116,7 @@ function renderWorkbookItem(wb) {
   const open = expanded.has(wb.id);
   const st = statusMap[wb.id] || {};
   return `<li class="wb-item" data-id="${wb.id}">
-    <div class="wb-item-head">
+    <div class="wb-item-head" tabindex="0" role="button" aria-expanded="${open}">
       <span>${open ? '▾' : '▸'}</span>
       <div style="flex:1;min-width:0">
         <div class="wb-item-title">${escapeHtml(wb.title)}</div>
@@ -117,10 +128,10 @@ function renderWorkbookItem(wb) {
           ${wb.source === 'ai' ? '<span class="badge">AI 생성</span>' : ''}
         </div>
       </div>
-      <button class="btn-icon" data-menu title="메뉴">⋯</button>
+      <button class="btn-icon" data-menu title="문제집 메뉴" aria-label="문제집 메뉴">⋯</button>
     </div>
     ${open ? `<ul class="wb-problems">
-      ${wb.problems.map((p, i) => `<li class="wb-problem ${state.currentProblem?.id === p.id ? 'active' : ''}" data-wb="${wb.id}" data-id="${p.id}"><span class="num">${i + 1}</span><span style="flex:1">${escapeHtml(p.title)}</span><span class="status-dot ${st[p.id] || ''}" title="${st[p.id] === 'done' ? '완료' : st[p.id] === 'draft' ? '작성 중' : '시작 전'}"></span></li>`).join('')}
+      ${wb.problems.map((p, i) => `<li class="wb-problem ${state.currentProblem?.id === p.id ? 'active' : ''}" data-wb="${wb.id}" data-id="${p.id}" tabindex="0" role="button"><span class="num">${i + 1}</span><span style="flex:1">${escapeHtml(p.title)}</span><span class="status-dot ${st[p.id] || ''}" title="${st[p.id] === 'done' ? '완료' : st[p.id] === 'draft' ? '작성 중' : '시작 전'}" aria-label="${st[p.id] === 'done' ? '완료' : st[p.id] === 'draft' ? '작성 중' : '시작 전'}"></span></li>`).join('')}
       <li style="padding:4px 12px 2px 24px"><button class="btn btn-sm" data-addp="${wb.id}">＋ 문제 추가</button></li>
     </ul>` : ''}
   </li>`;
@@ -131,7 +142,17 @@ function workbookMenu(e, wbId) {
   const wb = state.workbooks.find((w) => w.id === wbId);
   const items = [
     ['✏️ 문제집 정보 수정', async () => { if (await workbookForm(wb)) { await refreshWorkbooks(); renderList(); } }],
-    ['✨ AI 로 문제 추가', async () => { if (await aiGenerateDialog({ workbookId: wbId })) { await refreshWorkbooks(); expanded.add(wbId); renderList(); } }],
+    ['✨ AI 로 문제 추가', async () => {
+      const before = wb.problems.length;
+      const result = await aiGenerateDialog({ workbookId: wbId });
+      if (!result) return;
+      await refreshWorkbooks();
+      expanded.add(wbId);
+      const added = result.problems.length - before;
+      toast(`문제 ${added}개를 추가했습니다.`, 'ok');
+      if (added > 0) selectProblem(wbId, result.problems[before].id);
+      else renderList();
+    }],
     ['📤 폴더로 내보내기', async () => {
       const dir = await pickPath({ mode: 'dir', title: '내보낼 위치 선택' });
       if (!dir) return;
@@ -144,20 +165,11 @@ function workbookMenu(e, wbId) {
       if (state.currentWorkbook?.id === wbId) selectProblem(null, null);
       await refreshWorkbooks();
       renderList();
+      toast(`"${wb.title}" 을(를) 삭제했습니다.`, 'ok');
     }],
   ];
-  const pop = document.createElement('div');
-  pop.className = 'popover';
-  pop.style.cssText = `left:${Math.min(e.clientX, window.innerWidth - 220)}px;top:${e.clientY}px;min-width:200px;padding:4px`;
-  pop.innerHTML = items.map(([l], i) => `<div class="wb-problem" data-i="${i}" style="padding:7px 12px">${l}</div>`).join('');
-  document.body.appendChild(pop);
-  const closeMenu = () => pop.remove();
-  pop.addEventListener('click', (ev) => {
-    const it = ev.target.closest('[data-i]');
-    if (it) items[it.dataset.i][1]().catch((err) => toast(err.message, 'error'));
-    closeMenu();
-  });
-  setTimeout(() => document.addEventListener('mousedown', function h(ev) { if (!pop.contains(ev.target)) { closeMenu(); document.removeEventListener('mousedown', h); } }), 0);
+  const r = e.currentTarget?.getBoundingClientRect?.();
+  openMenu({ x: r ? r.left - 180 : e.clientX, y: r ? r.bottom + 4 : e.clientY, items });
 }
 
 // ---------- 문제 선택 ----------
@@ -207,7 +219,7 @@ async function renderProblem() {
       <button class="btn-icon" data-edit title="문제 수정">✏️</button>
       <button class="btn-icon" data-del title="문제 삭제">🗑</button>
     </div>
-    <div class="tabs">${tabs.map(([k, l]) => `<div class="tab ${activeTab === k ? 'active' : ''}" data-tab="${k}">${l}</div>`).join('')}</div>
+    <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<div class="tab ${activeTab === k ? 'active' : ''}" data-tab="${k}" role="tab" tabindex="0" aria-selected="${activeTab === k}">${l}</div>`).join('')}</div>
     <div class="pane-body" data-tabbody></div>`;
   root.querySelector('[data-back]').onclick = () => renderList();
   root.querySelector('[data-prev]').onclick = () => idx > 0 && selectProblem(wb.id, wb.problems[idx - 1].id);
@@ -222,14 +234,18 @@ async function renderProblem() {
   };
   root.querySelector('[data-del]').onclick = async () => {
     if (!(await confirmDialog(`"${p.title}" 문제와 답안을 삭제할까요?`, { danger: true, okLabel: '삭제' }))) return;
+    const next = wb.problems[idx + 1] || wb.problems[idx - 1] || null;
     await api.deleteProblem(wb.id, p.id);
+    state.currentProblem = null;
     await refreshWorkbooks();
-    selectProblem(null, null);
+    toast(`"${p.title}" 을(를) 삭제했습니다.`, 'ok');
+    if (next) selectProblem(wb.id, next.id);
+    else selectProblem(null, null);
   };
   root.querySelectorAll('.tab').forEach((t) =>
     t.addEventListener('click', () => {
       activeTab = t.dataset.tab;
-      root.querySelectorAll('.tab').forEach((x) => x.classList.toggle('active', x === t));
+      root.querySelectorAll('.tab').forEach((x) => { x.classList.toggle('active', x === t); x.setAttribute('aria-selected', String(x === t)); });
       renderTab();
     }),
   );
@@ -280,8 +296,8 @@ function renderReferences(body) {
       .map(
         (r) => `<div class="ref-item" data-file="${escapeHtml(r.file)}">
           <div class="row-between">
-            <div style="min-width:0"><div class="ref-name" title="클릭하여 미리보기">${iconFor(r.ext)} ${escapeHtml(r.name)}</div>
-              <div class="small muted">${escapeHtml(r.description || '')} <span>· ${escapeHtml(r.file)} · ${(r.size / 1024).toFixed(1)} KB</span></div></div>
+            <div style="min-width:0"><div class="ref-name" title="클릭하여 미리보기" tabindex="0" role="button">${iconFor(r.ext)} ${escapeHtml(r.name)}</div>
+              <div class="small muted">${[r.description, r.file !== r.name ? r.file : '', fmtSize(r.size)].filter(Boolean).map(escapeHtml).join(' · ')}</div></div>
             <div class="row">
               <a class="btn-icon" title="다운로드" href="${api.referenceUrl(wb.id, p.id, r.file, true)}">⬇</a>
               <button class="btn-icon" title="삭제" data-delref>🗑</button>
@@ -293,33 +309,39 @@ function renderReferences(body) {
       .join('')}`;
   const fileInput = body.querySelector('[data-fileinput]');
   body.querySelector('[data-upload]').onclick = () => fileInput.click();
-  fileInput.onchange = async () => {
-    for (const f of fileInput.files) {
+  const reportAdded = (ok, fail, renamed) => {
+    if (ok) toast(`참고자료 ${ok}개를 추가했습니다.${renamed.length ? ` 같은 이름이 있어 ${renamed.join(', ')} 로 저장했습니다.` : ''}`, 'ok');
+    if (fail) toast(`${fail}개 파일은 추가하지 못했습니다.`, 'error');
+  };
+  const addMany = async (items, fn) => {
+    let ok = 0, fail = 0;
+    const renamed = [];
+    for (const it of items) {
       try {
-        state.currentProblem = await api.addReference(wb.id, p.id, { fileName: f.name, contentBase64: await fileToBase64(f) });
+        const beforeFiles = new Set((state.currentProblem.references || []).map((r) => r.file));
+        state.currentProblem = await fn(it);
+        const added = state.currentProblem.references.find((r) => !beforeFiles.has(r.file));
+        if (added && added.file !== it.name) renamed.push(added.file);
+        ok++;
       } catch (err) {
-        toast(`${f.name}: ${err.message}`, 'error');
+        fail++;
+        toast(`${it.name}: ${err.message}`, 'error');
       }
     }
-    toast('참고자료를 추가했습니다.', 'ok');
+    reportAdded(ok, fail, renamed);
     emit('problem:changed', state.currentProblem);
   };
+  fileInput.onchange = () => addMany([...fileInput.files], async (f) => api.addReference(wb.id, p.id, { fileName: f.name, contentBase64: await fileToBase64(f) }));
   body.querySelector('[data-frompath]').onclick = async () => {
     const paths = await pickPath({ mode: 'file', multiple: true, title: '참고자료로 추가할 파일 선택' });
     if (!paths) return;
-    for (const path of paths) {
-      try {
-        state.currentProblem = await api.addReferenceFromPath(wb.id, p.id, path);
-      } catch (err) {
-        toast(err.message, 'error');
-      }
-    }
-    emit('problem:changed', state.currentProblem);
+    addMany(paths.map((path) => ({ path, name: path.split(/[\\/]/).pop() })), (it) => api.addReferenceFromPath(wb.id, p.id, it.path));
   };
   body.querySelector('[data-newtext]').onclick = async () => {
     const updated = await newTextReferenceDialog(wb.id, p.id);
     if (updated) {
       state.currentProblem = updated;
+      toast('참고자료를 추가했습니다.', 'ok');
       emit('problem:changed', updated);
     }
   };
@@ -349,9 +371,14 @@ function renderReferences(body) {
     item.querySelector('[data-delref]').onclick = async () => {
       if (!(await confirmDialog(`참고자료 "${ref.name}" 을(를) 삭제할까요?`, { danger: true, okLabel: '삭제' }))) return;
       state.currentProblem = await api.deleteReference(wb.id, p.id, file);
+      toast('참고자료를 삭제했습니다.', 'ok', 1500);
       emit('problem:changed', state.currentProblem);
     };
   });
+}
+
+function fmtSize(n) {
+  return n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`;
 }
 
 function iconFor(ext) {

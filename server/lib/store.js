@@ -176,10 +176,16 @@ export function deleteProblem(wbId, pId) {
 
 function normalizeSubmission(s) {
   const sub = s && typeof s === 'object' ? s : { format: String(s || '') };
+  let charLimit = null;
+  if (sub.charLimit !== undefined && sub.charLimit !== null && sub.charLimit !== '') {
+    const n = Number(sub.charLimit);
+    if (!Number.isInteger(n) || n < 0 || n > 1000000) throw httpError(400, '글자 수 제한은 0 이상의 정수여야 합니다. (0 또는 빈칸 = 제한 없음)');
+    charLimit = n > 0 ? n : null;
+  }
   return {
-    format: sub.format || '',
-    charLimit: sub.charLimit ? Number(sub.charLimit) : null,
-    deliverables: Array.isArray(sub.deliverables) ? sub.deliverables : [],
+    format: str(sub.format),
+    charLimit,
+    deliverables: Array.isArray(sub.deliverables) ? sub.deliverables.map(str).filter(Boolean) : [],
   };
 }
 

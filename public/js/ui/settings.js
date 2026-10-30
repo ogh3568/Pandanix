@@ -1,6 +1,6 @@
 // 설정 모달: API 키 / 기본 모델 / 파일 접근 폴더 / 채팅 옵션 / 정보
 import { api } from '../api.js';
-import { state, emit } from '../state.js';
+import { state, emit, prefs } from '../state.js';
 import { openModal, toast, confirmDialog } from './modal.js';
 import { escapeHtml } from '../markdown.js';
 
@@ -58,8 +58,11 @@ function renderKeys(el) {
       const r = await api.testProvider(name);
       result.innerHTML = r.ok ? `<span style="color:var(--ok)">✔ 연결 성공 · ${escapeHtml(r.detail || '')}</span>` : `<span style="color:var(--danger)">✘ ${escapeHtml(r.error || '실패')}</span>`;
     };
+    // Enter 로 저장
+    card.querySelectorAll('input').forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); card.querySelector('[data-save]').click(); } }));
     card.querySelector('[data-clear]')?.addEventListener('click', async () => {
-      if (!(await confirmDialog(`${name} 키를 삭제할까요?`, { danger: true, okLabel: '삭제' }))) return;
+      const label = state.settings.credentials[name]?.label || name;
+      if (!(await confirmDialog(`${label} 키를 삭제할까요?`, { danger: true, okLabel: '삭제' }))) return;
       await api.saveCredentials({ [name]: { apiKey: '__CLEAR__' } });
       state.settings = await api.settings();
       renderKeys(el);
@@ -70,7 +73,7 @@ function renderKeys(el) {
 function renderModels(el) {
   const { settings, providers, credentials } = state.settings;
   el.innerHTML = `
-    <div class="callout">프로바이더별 기본 모델입니다. 상단바에서 언제든 바꿀 수 있고, 여기 값은 앱 시작 시 기본값으로 쓰입니다. "목록" 버튼은 API 로 사용 가능한 모델을 조회합니다(키 필요).</div>
+    <div class="callout">프로바이더별 기본 모델입니다. 여기서 저장하면 상단바 선택도 이 값으로 맞춰집니다. "목록" 버튼은 API 로 사용 가능한 모델을 조회합니다(키 필요).</div>
     <div class="field"><label>기본 프로바이더</label><select name="defaultProvider">${Object.entries(providers).map(([k, p]) => `<option value="${k}" ${settings.defaultProvider === k ? 'selected' : ''}>${escapeHtml(p.label)}</option>`).join('')}</select></div>
     ${Object.entries(providers).map(([k, p]) => `
       <div class="field"><label>${escapeHtml(p.label)} 모델 ${credentials[k]?.configured ? '' : '<span class="badge">키 미설정</span>'}</label>
@@ -91,7 +94,11 @@ function renderModels(el) {
     el.querySelectorAll('[name^="model:"]').forEach((i) => (models[i.name.slice(6)] = i.value.trim()));
     await api.saveSettings({ defaultProvider: el.querySelector('[name=defaultProvider]').value, models });
     state.settings = await api.settings();
-    toast('저장했습니다.', 'ok');
+    // 상단바의 브라우저 기억값(localStorage)을 초기화해 설정값이 바로 반영되게
+    prefs.set('provider', null);
+    prefs.set('models', {});
+    emit('settings:changed', state.settings);
+    toast('저장했습니다. 상단바에 반영됩니다.', 'ok');
   };
 }
 
@@ -123,13 +130,13 @@ function renderChat(el) {
   const c = state.settings.settings.chat;
   const a = state.settings.settings.anthropic || {};
   el.innerHTML = `
-    <div class="field"><label>최대 출력 토큰</label><input type="number" name="maxOutputTokens" value="${c.maxOutputTokens}" min="256" /><div class="hint">응답이 중간에 잘리면 늘리세요. (기본 16000)</div></div>
+    <div class="field"><label>최대 출력 토큰</label><input type="number" name="maxOutputTokens" value="${c.maxOutputTokens}" min="256" /><div class="hint">응답이 중간에 잘리면 늘리세요. (기본 32000)</div></div>
     <div class="field"><label>참고자료 최대 글자 수 (프롬프트에 포함)</label><input type="number" name="maxReferenceChars" value="${c.maxReferenceChars}" min="1000" /><div class="hint">너무 크면 비용과 속도에 영향. 넘치는 부분은 잘립니다.</div></div>
-    <div class="field"><label>기본 컨텍스트 포함 여부</label>
-      <label><input type="checkbox" name="includeProblem" ${c.includeProblem ? 'checked' : ''}/> 지문·제출형식 포함</label>
-      <label><input type="checkbox" name="includeReferences" ${c.includeReferences ? 'checked' : ''}/> 참고자료 포함</label>
-      <label><input type="checkbox" name="includeAnswer" ${c.includeAnswer ? 'checked' : ''}/> 내 답안 포함</label></div>
-    <div class="field"><label>Claude 안전 거부 시 서버측 대체 모델 사용 (fallbacks)</label><label><input type="checkbox" name="fallbacks" ${a.fallbacks !== false ? 'checked' : ''}/> 사용</label><div class="hint">Claude 5 세대 모델에서 요청이 거부되면 Anthropic 이 권장하는 다른 모델로 자동 재시도합니다.</div></div>
+    <div class="field"><label>기본 컨텍스트 포함 여부 (채팅 체크박스 초기값)</label>
+      <div><label class="check"><input type="checkbox" name="includeProblem" ${c.includeProblem ? 'checked' : ''}/> 지문·제출형식 포함</label>
+      <label class="check"><input type="checkbox" name="includeReferences" ${c.includeReferences ? 'checked' : ''}/> 참고자료 포함</label>
+      <label class="check"><input type="checkbox" name="includeAnswer" ${c.includeAnswer ? 'checked' : ''}/> 내 답안 포함</label></div></div>
+    <div class="field"><label>Claude 안전 거부 시 서버측 대체 모델 사용 (fallbacks)</label><div><label class="check"><input type="checkbox" name="fallbacks" ${a.fallbacks !== false ? 'checked' : ''}/> 사용</label></div><div class="hint">Claude 5 세대 모델에서 요청이 거부되면 Anthropic 이 권장하는 다른 모델로 자동 재시도합니다.</div></div>
     <div class="field"><label>자동 저장 간격 (ms)</label><input type="number" name="autosaveMs" value="${state.settings.settings.editor.autosaveMs}" min="300" /></div>
     <button class="btn btn-primary" data-save>저장</button>`;
   el.querySelector('[data-save]').onclick = async () => {

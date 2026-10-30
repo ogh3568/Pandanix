@@ -5,22 +5,28 @@
 ## 한 줄 요약
 Windows 로컬에서 실행하는 Node.js(Express) + 순수 JS 프런트엔드 웹 앱. 사용자는 문제집의 문제를 풀며 Claude/GPT/Gemini/OpenCode 등 AI 와 채팅한다. 빌드 단계 없음, DB 없음(모두 `data/` 아래 JSON/파일).
 
-## 먼저 읽을 것 (순서대로)
-1. `docs/dev/architecture.md` — 폴더 구조, 요청 흐름, 핵심 모듈 한 장 요약
-2. `docs/dev/data-model.md` — `data/` 폴더와 JSON 스키마
-3. `docs/dev/api.md` — REST/SSE 엔드포인트 전체 목록
-4. `docs/dev/maintenance.md` — **흔한 수정 요청별 레시피** (프로바이더 추가, 프롬프트 수정, UI 변경, 버그 추적)
-5. `docs/dev/decisions.md` — 왜 이렇게 만들었는지(ADR). 바꾸기 전에 확인
-6. `docs/dev/changelog.md` — 변경 이력. **작업 후 반드시 한 줄 추가**
+## 먼저 읽을 것
+필독 (순서대로):
+1. `docs/dev/architecture.md` — 폴더 구조, 요청 흐름, 이벤트, 타임아웃/호환/보안 정책
+2. `docs/dev/maintenance.md` — **흔한 수정 요청별 레시피**, 용어집, 튜닝 상수 표, 테스트 가이드, 기술 부채
+
+참조 (필요할 때):
+- `docs/dev/data-model.md` — `data/` 폴더와 JSON 스키마
+- `docs/dev/api.md` — REST/SSE 엔드포인트 전체 목록
+- `docs/dev/providers.md` — AI SDK 호출 규약, 프로바이더 추가
+- `docs/dev/frontend.md` — 프런트 규약(렌더러·모달·오프라인·레이아웃)
+- `docs/dev/decisions.md` — 왜 이렇게 만들었는지(ADR). 바꾸기 전에 확인
+- `docs/dev/changelog.md` — 변경 이력. **작업 후 "미배포" 섹션에 한 줄 추가**
 
 ## 실행/검증 명령
 ```bash
 npm install          # 최초 1회
 npm start            # http://localhost:3210  (Windows: start.bat)
-npm run doctor       # 환경 점검 (--live: API 연결까지)
+npm run doctor       # 환경 점검 (npm run doctor:live 는 API 연결까지)
+npm run validate:library  # 내장 문제집 폴더 검사
 npm test             # 단위 + 통합 테스트. API 키 없이 모의 서버로 동작. 수정 후 항상 실행
 ```
-Linux/macOS 에서도 개발·테스트는 가능하다(doctor 가 OS 경고만 낸다).
+Node 22 이상 필수(openai SDK). Linux/macOS 에서도 개발·테스트는 가능하다. 키 없는 개발 환경에서는 doctor 가 "기본 프로바이더 키 없음" 실패 1건으로 exit 1 을 내는 것이 정상.
 
 ## 지도: 무엇을 고치려면 어디를 보나
 | 바꾸고 싶은 것 | 파일 |
@@ -29,13 +35,19 @@ Linux/macOS 에서도 개발·테스트는 가능하다(doctor 가 OS 경고만 
 | 프로바이더 추가/모델 기본값/키 환경변수 이름 | `server/config.js` (`PROVIDERS`) + `server/providers/*.js` |
 | 저장 구조(문제집/답안/채팅 파일) | `server/lib/store.js` |
 | API 라우트 | `server/routes/*.js` (settings, workbooks, answers, chat, generate, fs, doctor) |
-| 환경 점검 항목 | `server/doctor.js` |
+| 환경 점검 항목 | `server/doctor.js` (서버·CLI 공용) |
 | 화면 레이아웃/스타일 | `public/index.html`, `public/css/app.css` (색·간격은 `:root` 변수) |
 | 왼쪽 패널(문제집/문제) | `public/js/ui/sidebar.js`, 폼: `public/js/ui/workbookForms.js` |
 | 가운데 에디터 | `public/js/ui/editor.js` |
 | 오른쪽 채팅 | `public/js/ui/chat.js` |
-| 설정/Doctor/파일 탐색기 모달 | `public/js/ui/settings.js`, `doctor.js`, `filepicker.js` |
-| 프런트 API 호출 | `public/js/api.js` (fetch 는 여기서만) |
+| 설정/Doctor/파일 탐색기 모달 | `public/js/ui/settings.js`, `public/js/ui/doctor.js`, `public/js/ui/filepicker.js` |
+| 모달·메뉴·토스트 | `public/js/ui/modal.js` (`openModal`, `openMenu`, `toast`) — 다른 곳에서 직접 만들지 않는다 |
+| 프런트 API 호출 | `public/js/api.js` (fetch 는 여기서만. 엔드포인트를 바꾸면 `grep -r "/api/" public` 으로 확인) |
+| 마크다운 렌더러(채팅·문서 뷰어·참고자료) | `public/js/markdown.js` |
+| 전역 상태·이벤트 버스 | `public/js/state.js` |
+| HTML→Markdown/텍스트 변환(내보내기·글자 수) | `server/lib/html2md.js` |
+| 타임아웃·무응답 감시·로그 | `server/app.js tuneTimeouts/installCrashGuards`, `server/lib/watchdog.js`, `server/lib/log.js` |
+| 테스트·모의 AI 서버 | `tests/*.test.mjs`, `tests/mock-openai-server.mjs` |
 | 내장 문제집(라이브러리) | `server/seed/library/<slug>/` (폴더 추가만으로 등록됨), 목록/설치 로직 `server/seed.js` |
 
 ## 규칙 (지켜야 할 것)
@@ -46,7 +58,10 @@ Linux/macOS 에서도 개발·테스트는 가능하다(doctor 가 OS 경고만 
 - **스트리밍 응답은 SSE**(`server/lib/sse.js`). 클라이언트 중단 감지는 `res.on('close')` 를 쓴다(`req` 의 close 는 본문 수신 직후에도 발생).
 - **UI 문구와 문서는 한국어**. 코드 주석도 한국어 우선.
 - **문서 동기화**: 사용자에게 보이는 동작을 바꾸면 `docs/guide/` 의 해당 문서를, 구조를 바꾸면 `docs/dev/` 를 함께 고친다. 마지막에 `docs/dev/changelog.md` 에 한 줄.
-- Claude API 호출 규약(모델 ID, thinking, fallbacks)은 `server/providers/anthropic.js` 상단 주석과 `docs/dev/providers.md` 를 따른다. 모델 ID 에 날짜 접미사를 붙이지 않는다.
+- Claude API 호출 규약(모델 ID, thinking 미전송, fallbacks)은 `docs/dev/providers.md` 를 따른다. 모델 ID 에 날짜 접미사를 붙이지 않는다.
+- 키가 필요 없는 프로바이더는 `PROVIDERS[*].keyOptional` 로 표시한다(이름 하드코딩 금지).
+- 빠른 작업 버튼은 `server/lib/prompt.js QUICK_ACTIONS` 한 곳에서만 정의한다.
+- 사용자 경로·파일명 처리는 `resolveAllowed` / `safeName` 을 거치고, `data/config` 는 어떤 API 로도 노출하지 않는다.
 
 ## 알려진 한계 / 다음 할 일 후보
 `docs/dev/maintenance.md` 맨 아래 "백로그" 참고. (PDF/DOCX 참고자료 본문 추출, 다크 모드, 다국어 등)

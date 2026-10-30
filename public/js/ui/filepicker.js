@@ -5,6 +5,17 @@ import { escapeHtml, renderMarkdown, renderCsv } from '../markdown.js';
 import { prefs } from '../state.js';
 
 const fmtSize = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+let knownRoots = [];
+const insideRoots = (p) => knownRoots.some((r) => { const a = p.replace(/[\\/]+$/, '').toLowerCase(); const b = r.replace(/[\\/]+$/, '').toLowerCase(); return a === b || a.startsWith(b + '\\') || a.startsWith(b + '/'); });
+/** 경로 조각(breadcrumb) HTML. 허용 폴더 밖 조각은 클릭 불가로 표시 */
+function crumbsHtml(current) {
+  const parts = current.split(/[\\/]/).filter(Boolean);
+  const s = sep(current);
+  return `<button data-root title="허용된 폴더 목록">💽</button>` + parts.map((p, i) => {
+    const path = (current.startsWith('/') ? '/' : '') + parts.slice(0, i + 1).join(s) + (i === 0 && /^[A-Za-z]:$/.test(p) ? '\\' : '');
+    return insideRoots(path) ? `<button data-crumb="${escapeHtml(path)}">${escapeHtml(p)}</button>` : `<span class="muted" title="허용 폴더 밖">${escapeHtml(p)}</span>`;
+  }).join('<span class="muted">›</span>');
+}
 const fmtDate = (ms) => new Date(ms).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
 const sep = (p) => (p.includes('\\') ? '\\' : '/');
 const join = (dir, name) => (dir.endsWith(sep(dir)) ? dir + name : dir + sep(dir) + name);
@@ -44,6 +55,10 @@ export function pickPath({ mode = 'file', title, defaultName = '', multiple = fa
           label: mode === 'save' ? '저장' : '선택',
           primary: true,
           onClick: () => {
+            if (!current) {
+              toast('먼저 폴더로 들어가세요. (목록에서 폴더를 클릭)', 'error');
+              return false;
+            }
             if (mode === 'dir') return resolve(current);
             if (mode === 'save') {
               const name = body.querySelector('[data-filename]').value.trim();
@@ -65,18 +80,25 @@ export function pickPath({ mode = 'file', title, defaultName = '', multiple = fa
     });
 
     body.querySelector('[data-newdir]').addEventListener('click', async () => {
+      if (!current) return toast('먼저 폴더로 들어가세요.', 'error');
       const name = await promptDialog('새 폴더 이름', { title: '새 폴더' });
       if (!name) return;
-      await api.fsMkdir(join(current, name));
-      load(current);
+      try {
+        await api.fsMkdir(join(current, name));
+        toast('폴더를 만들었습니다.', 'ok', 1500);
+        load(current);
+      } catch (err) { toast(err.message, 'error'); }
     });
-    body.querySelector('[data-open-explorer]').addEventListener('click', () => current && api.fsOpen(current).catch((e) => toast(e.message, 'error')));
+    body.querySelector('[data-open-explorer]').addEventListener('click', () => (current ? api.fsOpen(current).catch((e) => toast(e.message, 'error')) : toast('먼저 폴더로 들어가세요.', 'error')));
 
     async function showRoots() {
       current = null;
       selected.clear();
       const { roots } = await api.fsRoots();
-      crumbsEl.innerHTML = `<span class="muted">허용된 폴더</span>`;
+      knownRoots = roots.map((r) => r.path);
+      // 허용 폴더가 하나뿐이면 바로 그 안으로
+      if (roots.length === 1 && roots[0].exists) return load(roots[0].path);
+      crumbsEl.innerHTML = `<span class="muted">허용된 폴더 (하나를 선택하세요)</span>`;
       listEl.innerHTML = roots
         .map((r) => `<div class="fp-row" data-dir="${escapeHtml(r.path)}"><span>💽</span><span>${escapeHtml(r.path)}</span><span class="sz"></span><span class="mt">${r.exists ? '' : '(없음)'}</span></div>`)
         .join('');
@@ -89,15 +111,8 @@ export function pickPath({ mode = 'file', title, defaultName = '', multiple = fa
         current = data.path;
         selected.clear();
         prefs.set('fp:last', current);
-        const parts = current.split(/[\\/]/).filter(Boolean);
-        crumbsEl.innerHTML =
-          `<button data-root>💽</button>` +
-          parts
-            .map((p, i) => {
-              const path = (current.startsWith('/') ? '/' : '') + parts.slice(0, i + 1).join(sep(current)) + (i === 0 && /^[A-Za-z]:$/.test(p) ? '\\' : '');
-              return `<button data-crumb="${escapeHtml(path)}">${escapeHtml(p)}</button>`;
-            })
-            .join('<span class="muted">›</span>');
+        if (!knownRoots.length) knownRoots = (await api.fsRoots()).roots.map((r) => r.path);
+        crumbsEl.innerHTML = crumbsHtml(current);
         const rows = [];
         if (data.parent) rows.push(`<div class="fp-row" data-dir="${escapeHtml(data.parent)}"><span>↩</span><span>..</span><span></span><span></span></div>`);
         for (const e of data.entries) {
@@ -178,7 +193,9 @@ export async function openFileExplorer() {
   async function showRoots() {
     current = null;
     const { roots } = await api.fsRoots();
-    crumbsEl.innerHTML = `<span class="muted">허용된 폴더</span>`;
+    knownRoots = roots.map((r) => r.path);
+    if (roots.length === 1 && roots[0].exists) return load(roots[0].path);
+    crumbsEl.innerHTML = `<span class="muted">허용된 폴더 (하나를 선택하세요)</span>`;
     listEl.innerHTML = roots.map((r) => `<div class="fp-row" data-dir="${escapeHtml(r.path)}"><span>💽</span><span>${escapeHtml(r.path)}</span><span></span><span class="mt">${r.exists ? '' : '(없음)'}</span></div>`).join('');
     previewEl.innerHTML = '<div class="small muted">폴더를 추가하려면 설정 > 파일 접근 허용 폴더.</div>';
   }
@@ -187,10 +204,8 @@ export async function openFileExplorer() {
       const data = await api.fsList(dir);
       current = data.path;
       prefs.set('fp:last', current);
-      const parts = current.split(/[\\/]/).filter(Boolean);
-      crumbsEl.innerHTML =
-        `<button data-root>💽</button>` +
-        parts.map((p, i) => `<button data-crumb="${escapeHtml((current.startsWith('/') ? '/' : '') + parts.slice(0, i + 1).join(sep(current)) + (i === 0 && /^[A-Za-z]:$/.test(p) ? '\\' : ''))}">${escapeHtml(p)}</button>`).join('<span class="muted">›</span>');
+      if (!knownRoots.length) knownRoots = (await api.fsRoots()).roots.map((r) => r.path);
+      crumbsEl.innerHTML = crumbsHtml(current);
       const rows = [];
       if (data.parent) rows.push(`<div class="fp-row" data-dir="${escapeHtml(data.parent)}"><span>↩</span><span>..</span><span></span><span></span></div>`);
       for (const e of data.entries)

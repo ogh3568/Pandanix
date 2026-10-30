@@ -1,9 +1,10 @@
 // 오른쪽 패널: AI 채팅 (문제별 대화 기록, 스트리밍, 빠른 작업, 답안에 삽입)
 import { api, streamPost } from '../api.js';
-import { state, on } from '../state.js';
+import { state, on, emit } from '../state.js';
 import { renderMarkdown, escapeHtml } from '../markdown.js';
 import { toast, confirmDialog } from './modal.js';
 import { insertMarkdown, getText } from './editor.js';
+import { openSettings } from './settings.js';
 
 let root, msgsEl, inputEl, scope = { wb: 'general', p: 'general' };
 let abort = null;
@@ -17,6 +18,7 @@ export async function initChat(el) {
   root.innerHTML = `
     <div class="chat-wrap">
       <div class="pane-head"><h2>AI 채팅</h2><span class="badge" data-scope>일반</span><button class="btn-icon" data-clear title="대화 지우기">🗑</button></div>
+      <div data-banner></div>
       <div class="quick-actions" data-quick>${Object.entries(quickActions).map(([k, q]) => `<button class="btn btn-sm" data-qa="${k}" title="${escapeHtml(q.prompt)}">${escapeHtml(q.label)}</button>`).join('')}</div>
       <div class="chat-messages" data-msgs></div>
       <div class="chat-compose">
@@ -38,7 +40,7 @@ export async function initChat(el) {
   msgsEl = root.querySelector('[data-msgs]');
   inputEl = root.querySelector('[data-input]');
   root.querySelector('[data-send]').onclick = () => send();
-  root.querySelector('[data-stop]').onclick = () => abort?.();
+  root.querySelector('[data-stop]').onclick = () => { if (abort) abort(); };
   root.querySelector('[data-clear]').onclick = async () => {
     if (!(await confirmDialog('이 문제의 대화 기록을 모두 지울까요?', { danger: true, okLabel: '지우기' }))) return;
     await api.clearChat(scope.wb, scope.p);
@@ -49,15 +51,27 @@ export async function initChat(el) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); send(); }
   });
   on('problem:selected', ({ wb, p }) => { scope = { wb, p }; updateScope(); loadHistory(); });
-  on('model:changed', updateModelLabel);
+  on('model:changed', () => { updateModelLabel(); renderBanner(); });
+  on('settings:changed', renderBanner);
   updateModelLabel();
+  renderBanner();
+}
+
+/** 현재 프로바이더에 키가 없으면 채팅 상단에 안내 배너 */
+function renderBanner() {
+  const el = root.querySelector('[data-banner]');
+  const cred = state.settings?.credentials?.[state.provider];
+  const prov = state.settings?.providers?.[state.provider];
+  if (!cred || cred.configured || prov?.keyOptional) return (el.innerHTML = '');
+  el.innerHTML = `<div class="chat-banner">🔑 <b>${escapeHtml(prov?.label || state.provider)}</b> 의 API 키가 없어 질문을 보낼 수 없습니다. <button class="btn btn-sm" data-open-settings>설정에서 키 입력</button> <span class="small">또는 상단바에서 키가 있는 프로바이더를 선택하세요.</span></div>`;
+  el.querySelector('[data-open-settings]').onclick = () => openSettings('keys');
 }
 
 function updateScope() {
   const general = scope.wb === 'general';
   root.querySelector('[data-scope]').textContent = general ? '일반' : '문제별 대화';
   root.querySelector('[data-quick]').style.display = general ? 'none' : '';
-  root.querySelectorAll('[data-ctx]').forEach((c) => (c.disabled = general));
+  root.querySelector('.chat-options').style.display = general ? 'none' : '';
 }
 function updateModelLabel() {
   root.querySelector('[data-model]').textContent = `${state.provider || '-'} / ${state.model || '(모델 미지정)'}`;
@@ -84,26 +98,46 @@ function appendMessage(m) {
   } else {
     el.innerHTML = `<div class="prose" data-content>${renderMarkdown(m.content || '')}</div>
       <div class="msg-meta"><span>${escapeHtml(m.model || '')}</span>${m.usage ? `<span>토큰 ${m.usage.input ?? '?'}→${m.usage.output ?? '?'}</span>` : ''}<span>${fmtTime(m.ts)}</span></div>
-      <div class="msg-tools"><button class="btn btn-sm" data-copy>복사</button><button class="btn btn-sm" data-insert>답안에 삽입</button></div>`;
-    el.querySelector('[data-copy]').onclick = () => navigator.clipboard.writeText(el._raw ?? m.content).then(() => toast('복사했습니다.', 'ok', 1200));
-    el.querySelector('[data-insert]').onclick = () => insertMarkdown(el._raw ?? m.content);
+      <div class="msg-tools"></div>`;
     el._raw = m.content;
+    setTools(el, m.error ? 'error' : 'normal');
   }
   msgsEl.appendChild(el);
   return el;
 }
+/** 말풍선 하단 버튼: 정상 응답은 복사/삽입, 오류는 다시 시도/설정 열기 */
+function setTools(el, kind) {
+  const tools = el.querySelector('.msg-tools');
+  if (kind === 'error') {
+    tools.innerHTML = `<button class="btn btn-sm" data-retry>다시 시도</button><button class="btn btn-sm" data-settings>설정 열기</button>`;
+    tools.querySelector('[data-retry]').onclick = () => { if (lastRequest) send(lastRequest.quickAction, lastRequest.text); };
+    tools.querySelector('[data-settings]').onclick = () => openSettings('keys');
+  } else {
+    tools.innerHTML = `<button class="btn btn-sm" data-copy>복사</button><button class="btn btn-sm" data-insert>답안에 삽입</button>`;
+    tools.querySelector('[data-copy]').onclick = () => navigator.clipboard.writeText(el._raw || '').then(() => toast('복사했습니다.', 'ok', 1200));
+    tools.querySelector('[data-insert]').onclick = () => insertMarkdown(el._raw || '');
+  }
+}
+let lastRequest = null;
+
 const fmtTime = (ts) => (ts ? new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '');
 const scrollBottom = () => (msgsEl.scrollTop = msgsEl.scrollHeight);
 
-function send(quickAction = null) {
-  const text = inputEl.value.trim();
+function send(quickAction = null, retryText = null) {
+  const text = retryText !== null ? retryText : inputEl.value.trim();
   if (!text && !quickAction) return;
-  if (abort) return toast('응답을 기다리는 중입니다.', 'error');
-  if (!state.model) return toast('상단바에서 모델을 지정하세요.', 'error');
+  if (abort) return toast('응답을 기다리는 중입니다. 먼저 ■ 중지를 누르세요.', 'error');
+  if (!state.model) return toast('상단바에서 모델을 지정하세요. (⟳ 버튼으로 목록을 불러올 수 있습니다)', 'error');
+  const cred = state.settings?.credentials?.[state.provider];
+  if (cred && !cred.configured && !state.settings?.providers?.[state.provider]?.keyOptional) {
+    toast(`${cred.label} API 키가 없습니다. 설정에서 키를 입력하세요.`, 'error');
+    return openSettings('keys');
+  }
+  lastRequest = { quickAction, text };
   const context = {};
   root.querySelectorAll('[data-ctx]').forEach((c) => (context[c.dataset.ctx] = c.checked));
   const answerText = context.answer || quickActions[quickAction]?.needsAnswer ? safeGetText() : '';
-  inputEl.value = '';
+  if (retryText === null) inputEl.value = '';
   appendMessage({ role: 'user', content: quickAction ? (quickActions[quickAction]?.prompt || quickAction) + (text ? `\n\n추가 요청: ${text}` : '') : text, quickAction, ts: new Date().toISOString() });
   const el = appendMessage({ role: 'assistant', content: '', model: state.model });
   const content = el.querySelector('[data-content]');
@@ -123,6 +157,7 @@ function send(quickAction = null) {
       },
       done: (d) => { finish(d.message.content, d.message); },
       error: (e) => { finish(raw ? raw + `\n\n❌ ${e.error}` : `❌ ${e.error}`, { model: state.model, error: true }); el.classList.add('msg-error'); },
+      abort: () => { finish((raw || '') + '\n\n(사용자가 중단함)', { model: state.model, aborted: true }); },
       end: () => { if (abort) finish(raw || '(응답 없음)', { model: state.model }); },
     },
   );
@@ -134,8 +169,14 @@ function send(quickAction = null) {
     content.innerHTML = renderMarkdown(finalText);
     el._raw = finalText;
     el.querySelector('.msg-meta').innerHTML = `<span>${escapeHtml(meta.model || '')}</span>${meta.usage ? `<span>토큰 ${meta.usage.input ?? '?'}→${meta.usage.output ?? '?'}</span>` : ''}<span>${fmtTime(new Date().toISOString())}</span>`;
+    setTools(el, meta.error ? 'error' : 'normal');
     scrollBottom();
   }
+}
+
+/** 외부(Ctrl+Enter 등)에서 호출용 */
+export function focusChatInput() {
+  inputEl?.focus();
 }
 function safeGetText() {
   try { return getText(); } catch { return ''; }

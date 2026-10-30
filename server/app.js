@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import { PROJECT_ROOT, DIRS, IS_WINDOWS } from './lib/paths.js';
 import { initConfigFiles, loadSettings } from './config.js';
 import { seedIfEmpty } from './seed.js';
+import { installFileLogging, LOG_FILE } from './lib/log.js';
 import { settingsRouter } from './routes/settings.js';
 import { workbooksRouter } from './routes/workbooks.js';
 import { answersRouter } from './routes/answers.js';
@@ -81,6 +82,8 @@ function hostGuard(req, res, next) {
 
 export async function startServer() {
   initConfigFiles();
+  installFileLogging();
+  installCrashGuards();
   seedIfEmpty();
   const settings = loadSettings();
   const port = Number(process.env.PORT || settings.port || 3210);
@@ -90,13 +93,21 @@ export async function startServer() {
     const url = `http://localhost:${port}`;
     console.log(`\n  Pandanix 실행 중: ${url}`);
     console.log(`  데이터 폴더: ${DIRS.data}`);
+    console.log(`  로그 파일: ${LOG_FILE}`);
     console.log(`  종료: Ctrl+C\n`);
     if (process.argv.includes('--open') || process.env.PANDANIX_OPEN === '1') openBrowser(url);
   });
-  // AI 응답은 길어질 수 있으므로 요청 타임아웃 해제
-  server.requestTimeout = 0;
-  server.headersTimeout = 60 * 60 * 1000;
-  server.keepAliveTimeout = 65 * 1000;
+  tuneTimeouts(server);
+  // Windows 일부 브라우저는 localhost 를 ::1 로 먼저 풀기 때문에 IPv6 루프백에도 같이 연다 (실패해도 무시)
+  if (host === '127.0.0.1') {
+    try {
+      const v6 = app.listen(port, '::1');
+      v6.on('error', () => {});
+      tuneTimeouts(v6);
+    } catch {
+      /* IPv6 미지원 환경 */
+    }
+  }
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`\n  포트 ${port} 가 이미 사용 중입니다. 이미 실행 중이면 브라우저에서 http://localhost:${port} 를 여세요.`);
@@ -130,6 +141,38 @@ function listDocs() {
   const order = ['시작하기', '사용 가이드', '개발/유지보수'];
   out.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || a.path.localeCompare(b.path));
   return out;
+}
+
+/**
+ * 타임아웃 정책: AI 응답·문제집 생성은 수 분이 걸릴 수 있으므로 요청/헤더 타임아웃을 사실상 해제한다.
+ * SSE 는 15초마다 하트비트를 보내 프록시·브라우저가 연결을 끊지 않게 한다 (server/lib/sse.js).
+ * 프로바이더 호출은 "무응답 감시"(routes/chat.js, generate.js) 로 5분간 아무 토큰도 없으면 끊고 오류를 알린다.
+ */
+function tuneTimeouts(server) {
+  server.requestTimeout = 0; // 요청 전체 시간 제한 없음
+  server.headersTimeout = 60 * 60 * 1000; // keepAliveTimeout 보다 커야 한다
+  server.keepAliveTimeout = 65 * 1000;
+  server.timeout = 0; // 소켓 유휴 제한 없음 (SSE 장시간 대기)
+}
+
+/**
+ * 예상치 못한 예외/거부로 서버(그리고 사용자가 보는 화면)가 꺼지지 않게 한다.
+ * 로컬 단일 사용자 앱이므로 "로그 남기고 계속" 이 사용자에게 더 낫다. start.bat 은 그래도 죽으면 자동 재시작한다.
+ */
+function installCrashGuards() {
+  process.on('unhandledRejection', (reason) => {
+    console.error('[pandanix] 처리되지 않은 Promise 거부 (서버는 계속 실행):', reason);
+  });
+  process.on('uncaughtException', (err) => {
+    if (err && err.code === 'EADDRINUSE') throw err; // 기동 실패는 그대로 알린다
+    console.error('[pandanix] 처리되지 않은 예외 (서버는 계속 실행):', err);
+  });
+  for (const sig of ['SIGINT', 'SIGTERM']) {
+    process.on(sig, () => {
+      console.log(`[pandanix] ${sig} 수신, 종료합니다.`);
+      process.exit(0);
+    });
+  }
 }
 
 function openBrowser(url) {

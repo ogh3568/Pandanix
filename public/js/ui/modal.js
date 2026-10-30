@@ -2,6 +2,15 @@
 import { escapeHtml } from '../markdown.js';
 
 const root = () => document.getElementById('modal-root');
+const modalStack = []; // 열린 모달 (맨 뒤가 최상위). Esc 는 최상위만 닫는다.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const top = modalStack[modalStack.length - 1];
+  if (top) {
+    e.preventDefault();
+    top.close();
+  }
+});
 
 /**
  * 모달을 연다. 반환값 { close, body, foot } .
@@ -10,9 +19,11 @@ const root = () => document.getElementById('modal-root');
 export function openModal({ title, body, buttons = [], wide = false, onClose }) {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
+  const titleId = 'modal-title-' + Math.random().toString(36).slice(2);
+  const opener = document.activeElement;
   backdrop.innerHTML = `
-    <div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true">
-      <div class="modal-head"><h3>${escapeHtml(title)}</h3><button class="btn-icon" data-close title="닫기">✕</button></div>
+    <div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true" aria-labelledby="${titleId}">
+      <div class="modal-head"><h3 id="${titleId}">${escapeHtml(title)}</h3><button class="btn-icon" data-close title="닫기" aria-label="닫기">✕</button></div>
       <div class="modal-body"></div>
       <div class="modal-foot"></div>
     </div>`;
@@ -47,17 +58,59 @@ export function openModal({ title, body, buttons = [], wide = false, onClose }) 
   backdrop.addEventListener('mousedown', (e) => {
     if (e.target === backdrop) close();
   });
-  const onKey = (e) => e.key === 'Escape' && close();
-  document.addEventListener('keydown', onKey);
+  // 포커스 트랩: Tab 이 모달 밖으로 나가지 않게
+  backdrop.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const focusables = [...backdrop.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((el) => !el.disabled && el.offsetParent !== null);
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
+    else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
+  });
   root().appendChild(backdrop);
-  const first = bodyEl.querySelector('input, textarea, select');
+  modalStack.push(ctx);
+  const first = bodyEl.querySelector('input, textarea, select') || backdrop.querySelector('[data-close]');
   first?.focus();
+  let closed = false;
   function close() {
-    document.removeEventListener('keydown', onKey);
+    if (closed) return;
+    closed = true;
+    const i = modalStack.indexOf(ctx);
+    if (i >= 0) modalStack.splice(i, 1);
     backdrop.remove();
     onClose?.();
+    if (opener && typeof opener.focus === 'function' && document.contains(opener)) opener.focus();
   }
   return ctx;
+}
+
+/**
+ * 간단한 팝오버 메뉴. items: [[label, onClick]] . 바깥 클릭·Esc 로 닫히고 방향키로 이동한다.
+ * @param {{x:number, y:number, items:Array<[string, Function]>, minWidth?:number}} opts
+ */
+export function openMenu({ x, y, items, minWidth = 200 }) {
+  document.querySelectorAll('.popover.menu').forEach((p) => p.remove());
+  const pop = document.createElement('div');
+  pop.className = 'popover menu';
+  pop.setAttribute('role', 'menu');
+  pop.style.cssText = `left:${Math.min(x, window.innerWidth - minWidth - 12)}px;top:${Math.min(y, window.innerHeight - items.length * 34 - 12)}px;min-width:${minWidth}px;padding:4px`;
+  pop.innerHTML = items.map(([l], i) => `<div class="menu-item" role="menuitem" tabindex="0" data-i="${i}">${l}</div>`).join('');
+  document.body.appendChild(pop);
+  const close = () => { pop.remove(); document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  const run = (i) => { close(); Promise.resolve(items[i][1]()).catch((err) => toast(err.message, 'error')); };
+  const onDown = (ev) => { if (!pop.contains(ev.target)) close(); };
+  const onKey = (ev) => {
+    const els = [...pop.querySelectorAll('.menu-item')];
+    const idx = els.indexOf(document.activeElement);
+    if (ev.key === 'Escape') { ev.preventDefault(); close(); }
+    else if (ev.key === 'ArrowDown') { ev.preventDefault(); els[(idx + 1) % els.length].focus(); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); els[(idx - 1 + els.length) % els.length].focus(); }
+    else if ((ev.key === 'Enter' || ev.key === ' ') && idx >= 0) { ev.preventDefault(); run(idx); }
+  };
+  pop.addEventListener('click', (ev) => { const it = ev.target.closest('[data-i]'); if (it) run(Number(it.dataset.i)); });
+  setTimeout(() => { document.addEventListener('mousedown', onDown); document.addEventListener('keydown', onKey); pop.querySelector('.menu-item')?.focus(); }, 0);
+  return close;
 }
 
 export function confirmDialog(message, { title = '확인', okLabel = '확인', danger = false } = {}) {
@@ -100,11 +153,19 @@ export function promptDialog(message, { title = '입력', defaultValue = '', pla
 }
 
 export function toast(message, type = 'info', ms = 3200) {
+  const rootEl = document.getElementById('toast-root');
+  // 같은 메시지가 이미 떠 있으면 겹치지 않고 시간만 연장
+  const dup = [...rootEl.children].find((c) => c.dataset.msg === message);
+  if (dup) { clearTimeout(dup._timer); dup._timer = setTimeout(() => dup.remove(), ms); return; }
   const el = document.createElement('div');
   el.className = `toast ${type === 'error' ? 'toast-error' : type === 'ok' ? 'toast-ok' : ''}`;
-  el.textContent = message;
-  document.getElementById('toast-root').appendChild(el);
-  setTimeout(() => el.remove(), type === 'error' ? Math.max(ms, 6000) : ms);
+  el.dataset.msg = message;
+  el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  el.innerHTML = `<span></span><button class="toast-close" aria-label="닫기">✕</button>`;
+  el.firstChild.textContent = message;
+  el.querySelector('.toast-close').onclick = () => el.remove();
+  rootEl.appendChild(el);
+  el._timer = setTimeout(() => el.remove(), type === 'error' ? Math.max(ms, 6000) : ms);
 }
 
 /** 폼 HTML 생성 도우미 */

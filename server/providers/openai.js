@@ -1,12 +1,13 @@
 // OpenAI 및 OpenAI 호환 엔드포인트(OpenCode Zen, Ollama, LM Studio 등) 프로바이더.
 import OpenAI from 'openai';
 
-export function createOpenAIProvider(name, { apiKey, baseUrl, organization }) {
+export function createOpenAIProvider(name, { apiKey, baseUrl, organization }, label = name) {
   const client = new OpenAI({
     apiKey: apiKey || 'not-set',
     ...(baseUrl ? { baseURL: baseUrl } : {}),
     ...(organization ? { organization } : {}),
     maxRetries: 2,
+    timeout: 20 * 60 * 1000, // 로컬 모델(Ollama 등)은 첫 토큰까지 오래 걸릴 수 있다
   });
 
   async function streamChat({ model, system, messages, maxTokens = 16000 }, onDelta, signal) {
@@ -57,10 +58,10 @@ export function createOpenAIProvider(name, { apiKey, baseUrl, organization }) {
           }
           return { text, stopReason: mapFinish(finish), usage: null, model };
         } catch (err2) {
-          throw normalizeError(name, err2);
+          throw normalizeError(label, err2);
         }
       }
-      throw normalizeError(name, err);
+      throw normalizeError(label, err);
     }
   }
 
@@ -69,7 +70,7 @@ export function createOpenAIProvider(name, { apiKey, baseUrl, organization }) {
     try {
       for await (const m of client.models.list()) out.push({ id: m.id, label: m.id });
     } catch (err) {
-      throw normalizeError(name, err);
+      throw normalizeError(label, err);
     }
     out.sort((a, b) => a.id.localeCompare(b.id));
     return out;

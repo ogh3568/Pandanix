@@ -5,7 +5,8 @@ import Anthropic from '@anthropic-ai/sdk';
 const FALLBACK_CAPABLE = /^claude-(opus-5|sonnet-5-5|fable-5)/;
 
 export function createAnthropicProvider({ apiKey, baseUrl }, settings = {}) {
-  const client = new Anthropic({ apiKey, ...(baseUrl ? { baseURL: baseUrl } : {}), maxRetries: 2 });
+  // timeout: 긴 보고서 생성에 대비해 20분 (SDK 기본 10분). 재시도는 연결 오류·429·5xx 에만 적용된다.
+  const client = new Anthropic({ apiKey, ...(baseUrl ? { baseURL: baseUrl } : {}), maxRetries: 2, timeout: 20 * 60 * 1000 });
   const useFallbacks = settings?.anthropic?.fallbacks !== false;
 
   async function streamChat({ model, system, messages, maxTokens = 16000 }, onDelta, signal) {

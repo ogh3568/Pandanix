@@ -1,6 +1,6 @@
 // 가운데 패널: 답안 에디터 (contenteditable 기반 간단 리치텍스트 + 표 + 첨부 + 자동저장 + 내보내기)
-import { api, fileToBase64 } from '../api.js';
-import { state, on, emit } from '../state.js';
+import { api, fileToBase64, connection } from '../api.js';
+import { state, on, emit, prefs } from '../state.js';
 import { escapeHtml, renderMarkdown } from '../markdown.js';
 import { toast, openModal, confirmDialog, promptDialog } from './modal.js';
 import { pickPath } from './filepicker.js';
@@ -10,6 +10,28 @@ let dirty = false;
 let saveTimer = null;
 let lastSavedHtml = '';
 let answerStatus = 'draft';
+let lastSavedAt = null;
+let saveFailed = false;
+
+/** 하단 저장 상태 표시 (오프라인·실패 시 빨간 고정 표시) */
+function renderSavedLabel() {
+  const el = statusEl.querySelector('[data-saved]');
+  if (!el || scope.wb === 'general') return;
+  if (saveFailed || (!connection.online && dirty)) {
+    el.innerHTML = `<span class="unsaved">⚠ 저장 안 됨 – 서버 연결을 확인하세요 (이 브라우저에 임시 보관 중)</span>`;
+    return;
+  }
+  el.className = 'muted';
+  el.textContent = lastSavedAt ? `저장됨 ${fmtSaved(lastSavedAt)}` : '아직 저장되지 않음';
+}
+function fmtSaved(d) {
+  const today = new Date().toDateString() === d.toDateString();
+  return today ? d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : d.toLocaleString('ko-KR');
+}
+function backupLocal() {
+  if (scope.wb === 'general') return;
+  prefs.set(`backup:${scope.wb}/${scope.p}`, { html: page.innerHTML, at: Date.now() });
+}
 
 const ALLOWED_TAGS = new Set(['P', 'BR', 'DIV', 'H1', 'H2', 'H3', 'H4', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'DEL', 'UL', 'OL', 'LI', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TD', 'TH', 'A', 'IMG', 'CODE', 'PRE', 'BLOCKQUOTE', 'HR', 'SPAN', 'SUP', 'SUB']);
 const ALLOWED_ATTRS = { A: ['href', 'target', 'rel', 'class', 'download'], IMG: ['src', 'alt'], TD: ['colspan', 'rowspan'], TH: ['colspan', 'rowspan'], SPAN: ['class'] };
@@ -29,20 +51,20 @@ export function initEditor(el) {
         <button class="tb" data-cmd="strikeThrough" title="취소선"><s>S</s></button>
         <button class="tb" data-cmd="removeFormat" title="서식 지우기">Tx</button>
         <span class="sep"></span>
-        <button class="tb" data-cmd="insertUnorderedList" title="글머리 기호">• 목록</button>
-        <button class="tb" data-cmd="insertOrderedList" title="번호 매기기">1. 목록</button>
+        <button class="tb" data-cmd="insertUnorderedList" title="글머리 기호 목록">•<span class="tb-label"> 목록</span></button>
+        <button class="tb" data-cmd="insertOrderedList" title="번호 매기기 목록">1.<span class="tb-label"> 목록</span></button>
         <button class="tb" data-cmd="insertHorizontalRule" title="구분선">—</button>
         <span class="sep"></span>
-        <button class="tb" data-table title="표 삽입">▦ 표</button>
+        <button class="tb" data-table title="표 삽입">▦<span class="tb-label"> 표</span></button>
         <button class="tb" data-image title="이미지 삽입">🖼</button>
-        <button class="tb" data-attach title="파일 첨부 (답안 폴더에 저장, 본문에 링크)">📎 첨부</button>
+        <button class="tb" data-attach title="파일 첨부 (답안 폴더에 저장, 본문에 링크)">📎<span class="tb-label"> 첨부</span></button>
         <button class="tb" data-link title="링크">🔗</button>
         <span class="sep"></span>
         <button class="tb" data-cmd="undo" title="실행 취소 (Ctrl+Z)">↶</button>
         <button class="tb" data-cmd="redo" title="다시 실행 (Ctrl+Y)">↷</button>
         <span style="flex:1"></span>
         <button class="tb" data-history title="이전 저장본 보기">🕘</button>
-        <button class="tb" data-export title="내보내기">⬇ 내보내기</button>
+        <button class="tb" data-export title="내보내기 (md/html/txt, 로컬 폴더 저장)">⬇<span class="tb-label"> 내보내기</span></button>
         <button class="tb" data-status title="완료 표시 전환">○ 작성 중</button>
         <button class="btn btn-sm btn-primary" data-save title="저장 (Ctrl+S)">저장</button>
       </div>
@@ -61,7 +83,7 @@ export function initEditor(el) {
   statusEl = root.querySelector('.editor-status');
 
   root.querySelectorAll('[data-cmd]').forEach((b) => {
-    if (b.tagName === 'SELECT') b.addEventListener('change', () => { exec('formatBlock', b.value); b.value = 'p'; });
+    if (b.tagName === 'SELECT') b.addEventListener('change', () => { exec('formatBlock', b.value); });
     else b.addEventListener('mousedown', (e) => { e.preventDefault(); exec(b.dataset.cmd); });
   });
   root.querySelector('[data-table]').addEventListener('mousedown', (e) => { e.preventDefault(); tableGrid(e.currentTarget); });
@@ -83,12 +105,18 @@ export function initEditor(el) {
   root.querySelector('[data-history]').addEventListener('click', showHistory);
   root.querySelector('[data-status]').addEventListener('click', toggleStatus);
 
-  page.addEventListener('input', () => { dirty = true; updateCounts(); scheduleSave(); });
+  try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch {}
+  page.addEventListener('input', () => { dirty = true; updateCounts(); scheduleSave(); backupLocal(); });
   page.addEventListener('paste', onPaste);
-  page.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(true); }
-    if (e.key === 'Tab' && closest('TD,TH')) { e.preventDefault(); moveCell(e.shiftKey ? -1 : 1); }
+  // Ctrl+S 는 어디에 포커스가 있어도 답안을 저장한다 (브라우저 "페이지 저장" 방지)
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (scope.wb !== 'general') save(true); }
   });
+  page.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab' && closest('TD,TH')) { e.preventDefault(); moveCell(e.shiftKey ? -1 : 1); }
+    else if (e.key === 'Tab' && closest('LI')) { e.preventDefault(); exec(e.shiftKey ? 'outdent' : 'indent'); }
+  });
+  connection.listeners.add((online) => { if (online && dirty) save(false); renderSavedLabel(); });
   page.addEventListener('click', (e) => {
     const a = e.target.closest('a');
     if (a && (e.ctrlKey || a.classList.contains('attachment-chip'))) { window.open(a.href, '_blank'); e.preventDefault(); }
@@ -121,6 +149,13 @@ function updateToolbarState() {
   if (!page.contains(document.activeElement) && document.activeElement !== page) return;
   for (const cmd of ['bold', 'italic', 'underline', 'strikeThrough', 'insertUnorderedList', 'insertOrderedList'])
     root.querySelector(`[data-cmd="${cmd}"]`)?.classList.toggle('active', document.queryCommandState(cmd));
+  // 문단 형식 select 가 현재 블록을 보여주도록
+  const block = closest('H1,H2,H3,H4,BLOCKQUOTE,PRE,P,DIV,LI');
+  const sel = root.querySelector('[data-cmd="formatBlock"]');
+  if (sel) {
+    const tag = block ? block.tagName.toLowerCase() : 'p';
+    sel.value = [...sel.options].some((o) => o.value === tag) ? tag : 'p';
+  }
 }
 
 // ---------- 불러오기 / 저장 ----------
@@ -147,10 +182,20 @@ async function load(wb, p) {
     lastSavedHtml = page.innerHTML;
     answerStatus = state.answer.status || 'draft';
     dirty = false;
+    // 서버가 꺼져 있던 동안 브라우저에 남긴 백업이 더 새로우면 복구
+    const backup = prefs.get(`backup:${wb}/${p}`);
+    if (backup && backup.html !== lastSavedHtml && (!state.answer.updatedAt || backup.at > Date.parse(state.answer.updatedAt))) {
+      if (await confirmDialog('서버에 저장되지 않은 더 최근 답안이 이 브라우저에 남아 있습니다. 복구할까요?', { title: '임시 저장본 복구', okLabel: '복구' })) {
+        page.innerHTML = sanitize(backup.html);
+        dirty = true;
+        scheduleSave();
+      } else prefs.set(`backup:${wb}/${p}`, null);
+    }
     renderStatusButton();
     renderAttachments();
     updateCounts();
-    statusEl.querySelector('[data-saved]').textContent = state.answer.updatedAt ? `마지막 저장 ${new Date(state.answer.updatedAt).toLocaleString('ko-KR')}` : '아직 저장되지 않음';
+    lastSavedAt = state.answer.updatedAt ? new Date(state.answer.updatedAt) : null;
+    renderSavedLabel();
     updateTitle();
   } catch (err) {
     toast(err.message, 'error');
@@ -176,11 +221,17 @@ async function save(explicit) {
     const res = await api.saveAnswer(scope.wb, scope.p, { html, status: answerStatus });
     lastSavedHtml = html;
     dirty = false;
-    statusEl.querySelector('[data-saved]').textContent = `저장됨 ${new Date(res.updatedAt).toLocaleTimeString('ko-KR')}`;
+    saveFailed = false;
+    lastSavedAt = new Date(res.updatedAt);
+    prefs.set(`backup:${scope.wb}/${scope.p}`, null);
+    renderSavedLabel();
     emit('answer:saved', { wb: scope.wb, p: scope.p, status: answerStatus });
     if (explicit) toast('저장했습니다.', 'ok', 1200);
   } catch (err) {
-    toast('저장 실패: ' + err.message, 'error');
+    saveFailed = true;
+    backupLocal();
+    renderSavedLabel();
+    if (explicit || !err.offline) toast('저장 실패: ' + err.message, 'error');
   }
 }
 
@@ -329,6 +380,35 @@ function moveCell(dir) {
   s.removeAllRanges();
   s.addRange(r);
 }
+/**
+ * 표 조작을 브라우저 실행 취소(Ctrl+Z) 이력에 남기기 위해: DOM 을 직접 바꾼 뒤
+ * 바뀐 표의 HTML 을 원래 표 자리에 insertHTML 로 다시 넣는다.
+ */
+function undoableTableOp(table, fn) {
+  const before = table.outerHTML;
+  fn();
+  const stillThere = page.contains(table);
+  const after = stillThere ? table.outerHTML : '';
+  // DOM 을 원래대로 되돌린 뒤 execCommand 로 같은 변경을 적용 (이력에 남도록)
+  const marker = document.createElement('span');
+  if (stillThere) table.replaceWith(marker);
+  else {
+    // 삭제된 경우: 원래 위치를 모르므로 before 를 다시 넣고 선택 후 삭제
+    const sel = window.getSelection();
+    if (sel.rangeCount) sel.getRangeAt(0).insertNode(marker);
+    else page.appendChild(marker);
+  }
+  marker.outerHTML = before; // 원상 복구
+  const restored = stillThere ? [...page.querySelectorAll('table')].find((t) => t.outerHTML === before) : [...page.querySelectorAll('table')].find((t) => t.outerHTML === before);
+  if (!restored) return;
+  const range = document.createRange();
+  range.selectNode(restored);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  document.execCommand('insertHTML', false, after + (after ? '' : '<p><br></p>'));
+}
+
 function addRow(cell) {
   const tr = cell.closest('tr');
   const clone = tr.cloneNode(true);
@@ -357,7 +437,12 @@ function tableToolbar() {
     const b = document.createElement('button');
     b.className = 'tb';
     b.textContent = label;
-    b.addEventListener('mousedown', (e) => { e.preventDefault(); fn(); dirty = true; updateCounts(); scheduleSave(); bar.remove(); });
+    b.addEventListener('mousedown', async (e) => {
+      e.preventDefault();
+      if (label === '표 삭제' && !(await confirmDialog('표를 삭제할까요? (Ctrl+Z 로 되돌릴 수 있습니다)', { okLabel: '삭제', danger: true }))) return;
+      undoableTableOp(table, fn);
+      dirty = true; updateCounts(); scheduleSave(); bar.remove();
+    });
     bar.appendChild(b);
   }
   document.body.appendChild(bar);
@@ -451,12 +536,19 @@ async function saveTo(format) {
   const r = await api.exportAnswer(scope.wb, scope.p, { format, path: full.slice(0, i), fileName: full.slice(i + 1) });
   toast(`저장했습니다: ${r.path}`, 'ok', 6000);
 }
+/** history 파일명(UTC, 2026-10-30T10-57-39-023Z) → 현지 시각 */
+function historyLabel(stamp) {
+  const iso = stamp.replace(/^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/, '$1T$2:$3:$4.$5Z');
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? stamp : d.toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'medium' });
+}
+
 async function showHistory() {
   if (scope.wb === 'general') return;
   const { history } = await api.answerHistory(scope.wb, scope.p);
   const body = document.createElement('div');
   body.innerHTML = history.length
-    ? `<div class="row" style="align-items:flex-start;gap:12px"><div style="width:220px;flex:none" class="stack">${history.map((h) => `<button class="btn btn-sm" data-h="${h.file}">${h.savedAt.replace('T', ' ').replace(/-(\d\d)-(\d\d)-\d+Z$/, ':$1:$2')}</button>`).join('')}</div><div style="flex:1;min-width:0"><div class="prose" data-view style="border:1px solid var(--border);border-radius:8px;padding:10px;max-height:50vh;overflow:auto">왼쪽에서 저장본을 선택하세요.</div></div></div>`
+    ? `<div class="row" style="align-items:flex-start;gap:12px"><div style="width:220px;flex:none" class="stack">${history.map((h) => `<button class="btn btn-sm" data-h="${h.file}">${historyLabel(h.savedAt)}</button>`).join('')}</div><div style="flex:1;min-width:0"><div class="prose" data-view style="border:1px solid var(--border);border-radius:8px;padding:10px;max-height:50vh;overflow:auto">왼쪽에서 저장본을 선택하세요.</div></div></div>`
     : '<div class="empty">저장 기록이 없습니다.</div>';
   let selectedHtml = null;
   openModal({

@@ -28,11 +28,15 @@ server/
   config.js                PROVIDERS 정의, 설정/자격증명 로드·저장·마스킹
   doctor.js / doctor-cli.js
   seed.js + seed/library/<slug>/   내장 문제집 라이브러리(첫 실행 시 전부 설치, 가져오기 폴더 형식 예시)
+  validate-library.js      라이브러리 무결성 검사 (npm run validate:library)
   lib/paths.js             DATA_DIR, 허용 루트 검사(resolveAllowed), JSON 읽기/쓰기
   lib/store.js             문제집·문제·참고자료·답안·첨부·채팅·가져오기/내보내기
   lib/prompt.js            프롬프트 템플릿, extractJson
   lib/html2md.js           에디터 HTML → Markdown/텍스트, 글자 수
   lib/sse.js               SSE 응답 도우미
+  lib/watchdog.js          프로바이더 무응답 감시
+  lib/log.js               파일 로깅 (data/logs)
+  lib/sendfile.js          사용자 파일 서빙 규칙
   providers/index.js       getProvider(name), resolveProviderAndModel
   providers/anthropic.js | openai.js | gemini.js
   routes/settings.js | workbooks.js | answers.js | chat.js | generate.js | fs.js | doctor.js
@@ -71,12 +75,12 @@ data/                      사용자 데이터 (git 제외)
 ### 프런트 이벤트
 | 이벤트 | 발행 | 구독 |
 |---|---|---|
-| `problem:selected {wb,p,problem}` | sidebar | editor(답안 로드), chat(기록 로드) |
-| `problem:changed` | sidebar/폼 | sidebar 재렌더 |
-| `workbooks:changed` | workbookForms.refreshWorkbooks | sidebar |
+| `problem:selected {wb,p,problem}` | sidebar, workbookForms.refreshWorkbooks(문제집이 사라졌을 때) | editor(답안 로드), chat(기록 로드) |
+| `problem:changed` | sidebar/폼, sidebar.syncFromServer | sidebar 재렌더, editor(제목·글자 수 제한 갱신) |
+| `workbooks:changed` | workbookForms.refreshWorkbooks | sidebar, editor(상단 제목) |
 | `answer:saved {wb,p,status}` | editor | sidebar(상태 점) |
 | `model:changed` | app(상단바) | chat(라벨) |
-| `settings:changed` | settings 모달 닫힘 | app(상단바 재구성) |
+| `settings:changed` | settings 모달 닫힘/기본 모델 저장 | app(상단바 재구성), chat(키 배너) |
 
 ## 프로바이더 공통 인터페이스
 ```js
@@ -90,8 +94,23 @@ data/                      사용자 데이터 (git 제외)
 ```
 자세한 구현 규약은 `providers.md`.
 
+## 타임아웃·안정성 정책
+- HTTP 서버: `requestTimeout=0`, `timeout=0`, `headersTimeout=1h`, `keepAliveTimeout=65s` (`app.js tuneTimeouts`). SSE 는 15초 하트비트.
+- 프로바이더 SDK: timeout 20분, 재시도 2회(연결 오류·429·5xx). 무응답 감시(`lib/watchdog.js`): 5분간 토큰이 없으면 끊고 오류 이벤트.
+- 클라이언트(`api.js streamPost`): 90초 동안 아무 바이트도 없으면 연결 끊김으로 처리. `connection` 객체로 오프라인 상태 전파 → 상단 배너, 에디터 "저장 안 됨" 표시 + localStorage 백업.
+- 프로세스: `unhandledRejection`/`uncaughtException` 은 로그만 남기고 계속 실행(`installCrashGuards`), 로그는 `data/logs/pandanix.log`. `start.bat` 은 비정상 종료 시 최대 5회 자동 재시작.
+- 수신: `127.0.0.1` 과 `::1` 둘 다(Windows 브라우저의 localhost→IPv6 우선 대비).
+
+## Windows/Linux 호환 메모
+- 경로 비교는 `normalizeForCompare`(Windows 만 소문자). 파일명은 `safeName`(예약 이름 CON/NUL, 끝 점·공백, 200바이트 제한). Windows 에서 끝 점·공백이 붙은 사용자 경로는 거부.
+- JSON 읽기는 BOM 허용(메모장 저장 대비). 텍스트 참고자료는 UTF-8 실패 시 EUC-KR 재시도(한국어 Excel CSV).
+- 줄바꿈은 `\r` 제거 후 처리(markdown.js, html2md.js, renderCsv). `.bat` 는 CRLF, 나머지는 LF(`.gitattributes`).
+- `rename` 은 EPERM/EBUSY(백신·색인기 잠금) 시 재시도. 탐색기 열기는 `explorer.exe`/`open`/`xdg-open` 분기.
+- 테스트는 Linux/macOS/Windows 어디서나 `npm test`(`node --test` 자동 탐색, 임시 폴더 격리).
+
 ## 보안 모델 (로컬 앱 기준)
-- 서버는 `127.0.0.1` 에만 바인딩(기본). 인증 없음 → 공유 망 노출 금지(`HOST` 변경 시 사용자 책임, FAQ 에 명시).
+- 서버는 루프백(`127.0.0.1`, `::1`)에만 바인딩(기본)하고 Host 헤더를 검사한다(DNS rebinding 방지). 인증 없음 → 공유 망 노출 금지(`HOST` 변경 시 사용자 책임, FAQ 에 명시).
+- 파일 API 는 `data/config` 를 절대 노출하지 않고, 앱 내부 폴더(workbooks/answers)는 통째로 지울 수 없다.
 - 키는 서버에만 존재, 응답은 마스킹.
-- 에디터 HTML 은 클라이언트 `sanitize()` 로 허용 태그만 저장/표시. 서버는 HTML 을 그대로 저장(로컬 단일 사용자 전제).
+- 에디터 HTML 은 클라이언트 `sanitize()` 로 허용 태그만 저장/표시. 서버는 HTML 을 그대로 저장(로컬 단일 사용자 전제). 사용자가 올린 HTML/SVG 파일은 inline 으로 서빙하지 않는다(`lib/sendfile.js`).
 - 경로 순회 방지: `resolveAllowed`, `safeName`, ID 정규식(`^[A-Za-z0-9_-]{1,64}$`).

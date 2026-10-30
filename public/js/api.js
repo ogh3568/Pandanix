@@ -1,12 +1,26 @@
 // 서버 API 호출 모듈. 모든 fetch 는 여기서만 한다. (엔드포인트 목록: docs/dev/api.md)
 
+export const OFFLINE_MESSAGE = '서버에 연결할 수 없습니다. 검은 서버 창이 닫혔는지 확인하고 start.bat 을 다시 실행하세요.';
+
+/** 서버 연결 상태 (editor 의 저장 실패 표시, 상단 배너 등에서 참조) */
+export const connection = { online: true, listeners: new Set(), set(v) { if (this.online !== v) { this.online = v; this.listeners.forEach((fn) => fn(v)); } } };
+
 async function request(method, url, body, opts = {}) {
-  const res = await fetch(url, {
-    method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    ...opts,
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      ...opts,
+    });
+  } catch (err) {
+    connection.set(false);
+    const e = new Error(OFFLINE_MESSAGE);
+    e.offline = true;
+    throw e;
+  }
+  connection.set(true);
   const ct = res.headers.get('content-type') || '';
   const data = ct.includes('application/json') ? await res.json() : await res.text();
   if (!res.ok) {
@@ -50,7 +64,7 @@ export const api = {
   addReferenceFromPath: (wb, p, path, description) => request('POST', `/api/workbooks/${wb}/problems/${p}/references/from-path`, { path, description }),
   deleteReference: (wb, p, file) => request('DELETE', `/api/workbooks/${wb}/problems/${p}/references/${encodeURIComponent(file)}`),
   referenceText: async (wb, p, file) => {
-    const res = await fetch(`/api/workbooks/${wb}/problems/${p}/references/${encodeURIComponent(file)}`);
+    const res = await fetch(`/api/workbooks/${wb}/problems/${p}/references/${encodeURIComponent(file)}?text=1`);
     if (!res.ok) throw new Error(`참고자료를 읽을 수 없습니다 (HTTP ${res.status})`);
     return res.text();
   },
@@ -100,10 +114,12 @@ export function streamPost(url, body, handlers = {}) {
     try {
       res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal });
     } catch (err) {
-      if (ctrl.signal.aborted) return;
-      handlers.error?.({ error: '서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.' });
+      if (ctrl.signal.aborted) return handlers.abort?.();
+      connection.set(false);
+      handlers.error?.({ error: OFFLINE_MESSAGE });
       return;
     }
+    connection.set(true);
     if (!res.ok) {
       let msg = `HTTP ${res.status}`;
       try {
@@ -116,10 +132,20 @@ export function streamPost(url, body, handlers = {}) {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';
+    // 연결 감시: 서버는 15초마다 하트비트(: ping)를 보낸다. 90초 동안 아무것도 안 오면 끊긴 것으로 본다 (절전 모드 복귀 등).
+    let lastActivity = Date.now();
+    const idleTimer = setInterval(() => {
+      if (Date.now() - lastActivity > 90000) {
+        clearInterval(idleTimer);
+        ctrl.abort();
+        handlers.error?.({ error: '서버와의 연결이 끊겼습니다 (90초 무응답). 다시 시도하세요.' });
+      }
+    }, 5000);
     try {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
+        lastActivity = Date.now();
         buf += decoder.decode(value, { stream: true });
         let idx;
         while ((idx = buf.indexOf('\n\n')) >= 0) {
@@ -139,12 +165,18 @@ export function streamPost(url, body, handlers = {}) {
           }
         }
       }
+      clearInterval(idleTimer);
       handlers.end?.();
     } catch (err) {
-      if (!ctrl.signal.aborted) handlers.error?.({ error: err.message });
+      clearInterval(idleTimer);
+      if (ctrl.signal.aborted) handlers.abort?.();
+      else handlers.error?.({ error: err.message });
     }
   })();
-  return () => ctrl.abort();
+  return () => {
+    if (ctrl.signal.aborted) return;
+    ctrl.abort();
+  };
 }
 
 /** 업로드 가능 최대 크기 (서버 본문 80MB 제한, base64 팽창 고려) */

@@ -8,6 +8,7 @@ import path from 'node:path';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pandanix-test-'));
 process.env.PANDANIX_DATA_DIR = tmp;
 process.env.PORT = '0';
+process.env.PANDANIX_STALL_TIMEOUT_MS = '700'; // 무응답 감시 테스트용
 
 const { startMock } = await import('./mock-openai-server.mjs');
 const { createApp } = await import('../server/app.js');
@@ -251,6 +252,15 @@ test('채팅 이력에서 오류·중단 메시지는 모델에 전달되지 않
   // 모의 서버는 시스템 프롬프트 길이만 알려주므로 여기서는 성공 여부만 확인하고, 이력 구성은 단위 수준에서 검사
   const hist = (await j('GET', '/api/chat/general/general')).data.messages;
   assert.ok(hist.some((m) => m.error));
+});
+
+test('AI 서버가 응답을 멈추면 무응답 감시가 끊고 오류를 알린다', async () => {
+  const { events } = await sse('/api/chat/general/general/stream', { message: 'STALL 테스트' });
+  const err = events.find(([e]) => e === 'error');
+  assert.ok(err, JSON.stringify(events));
+  assert.match(err[1].error, /응답이 없어/);
+  const hist = (await j('GET', '/api/chat/general/general')).data.messages;
+  assert.ok(hist[hist.length - 1].error);
 });
 
 test('Host 헤더가 localhost 계열이 아니면 403 (DNS rebinding 방지)', async () => {

@@ -23,7 +23,7 @@ export function getProvider(name, { requireKey = true } = {}) {
     case 'gemini':
       return createGeminiProvider(creds);
     case 'openai':
-      return createOpenAIProvider(name, creds);
+      return createOpenAIProvider(name, creds, def.label);
     default:
       throw httpError(500, `프로바이더 종류 미구현: ${def.kind}`);
   }

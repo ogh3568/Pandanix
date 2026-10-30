@@ -6,6 +6,7 @@ import { openSse } from '../lib/sse.js';
 import { wrap } from '../lib/async.js';
 import { loadSettings } from '../config.js';
 import { httpError } from '../lib/paths.js';
+import { createStallWatchdog } from '../lib/watchdog.js';
 
 export const chatRouter = Router();
 
@@ -73,6 +74,8 @@ chatRouter.post(
     res.on('close', () => { if (!res.writableEnded) abort.abort(); });
 
     let partial = ''; // 중단 시에도 받은 만큼은 보존한다 (프로바이더마다 중단 동작이 달라 라우트에서 통일)
+    let stallMessage = null;
+    const watchdog = createStallWatchdog(abort, (msg) => { stallMessage = msg; });
     const saveAborted = () => {
       try {
         store.appendChat(wb, p, { role: 'assistant', content: partial ? partial + '\n\n(사용자가 중단함)' : '(사용자가 중단함)', provider, model, aborted: true });
@@ -83,10 +86,13 @@ chatRouter.post(
         { model, system, messages, maxTokens: settings.chat.maxOutputTokens },
         (delta) => {
           partial += delta;
+          watchdog.touch();
           sse.send('delta', { text: delta });
         },
         abort.signal,
       );
+      watchdog.stop();
+      if (stallMessage) throw new Error(stallMessage);
       if (abort.signal.aborted) return saveAborted();
       let content = result.text;
       if (result.stopReason === 'refusal') content = (content ? content + '\n\n' : '') + '⚠️ 모델이 이 요청에 대한 응답을 거부했습니다. 질문을 바꿔 보세요.';
@@ -96,9 +102,10 @@ chatRouter.post(
       store.appendChat(wb, p, saved);
       sse.send('done', { message: saved });
     } catch (err) {
-      if (abort.signal.aborted) saveAborted();
+      watchdog.stop();
+      if (abort.signal.aborted && !stallMessage) saveAborted();
       else {
-        const msg = err.message || String(err);
+        const msg = stallMessage || err.message || String(err);
         try { store.appendChat(wb, p, { role: 'assistant', content: `❌ 오류: ${msg}`, provider, model, error: true }); } catch {}
         sse.send('error', { error: msg });
       }
