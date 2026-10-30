@@ -1,0 +1,10 @@
+node_modules/
+# 사용자 데이터 (API 키 포함) - 절대 커밋하지 않음
+data/config/credentials.json
+data/config/settings.json
+data/workbooks/
+data/answers/
+data/tmp/
+*.log
+.DS_Store
+Thumbs.db

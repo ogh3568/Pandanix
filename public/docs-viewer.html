@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pandanix 가이드</title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <style>
+    body { overflow: auto; }
+    .docs { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+    .docs-nav { background: var(--panel); border-right: 1px solid var(--border); padding: 16px; position: sticky; top: 0; height: 100vh; overflow: auto; }
+    .docs-nav h3 { font-size: 12px; color: var(--muted); text-transform: uppercase; margin: 14px 0 4px; }
+    .docs-nav a { display: block; padding: 5px 8px; border-radius: 6px; text-decoration: none; color: var(--text); font-size: 13.5px; }
+    .docs-nav a.active, .docs-nav a:hover { background: var(--accent-soft); color: var(--accent); }
+    .docs-main { padding: 28px 40px 80px; max-width: 900px; }
+    .docs-main .prose h1 { font-size: 1.8em; margin-top: 0; }
+    .docs-main .prose h2 { font-size: 1.35em; margin-top: 1.6em; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+    .docs-main .prose pre { font-size: 12.5px; }
+    .docs-main .prose table { font-size: 13.5px; }
+    @media (max-width: 800px) { .docs { grid-template-columns: 1fr; } .docs-nav { position: static; height: auto; } }
+  </style>
+</head>
+<body>
+  <div class="docs">
+    <nav class="docs-nav"><div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span></div><div id="nav"></div><p class="small muted" style="margin-top:20px"><a href="/">← 앱으로</a></p></nav>
+    <main class="docs-main"><div class="prose" id="content">불러오는 중…</div></main>
+  </div>
+  <script type="module">
+    import { renderMarkdown } from '/js/markdown.js';
+    const nav = document.getElementById('nav');
+    const content = document.getElementById('content');
+    const { files } = await (await fetch('/api/docs')).json();
+    const groups = {};
+    for (const f of files) (groups[f.group] ||= []).push(f);
+    nav.innerHTML = Object.entries(groups).map(([g, fs]) => `<h3>${g}</h3>${fs.map((f) => `<a href="#${f.path}" data-path="${f.path}">${f.title}</a>`).join('')}`).join('');
+    async function show() {
+      const path = location.hash.slice(1) || files[0]?.path;
+      if (!path) return;
+      nav.querySelectorAll('a').forEach((a) => a.classList.toggle('active', a.dataset.path === path));
+      const res = await fetch('/docs/' + path);
+      let md = await res.text();
+      // 상대 링크를 뷰어 해시 링크로 변환
+      content.innerHTML = renderMarkdown(md).replace(/href="(?!https?:|#)([^"]+\.md)"/g, (m, p) => `href="#${resolve(path, p)}"`);
+      window.scrollTo(0, 0);
+    }
+    function resolve(base, rel) {
+      const parts = base.split('/').slice(0, -1);
+      for (const seg of rel.split('/')) { if (seg === '..') parts.pop(); else if (seg !== '.') parts.push(seg); }
+      return parts.join('/');
+    }
+    window.addEventListener('hashchange', show);
+    show();
+  </script>
+</body>
+</html>

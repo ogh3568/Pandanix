@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pandanix · AI 활용 연습</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐼</text></svg>" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-logo">🐼</span>
+      <span class="brand-name">Pandanix</span>
+      <span class="brand-sub">AI 활용 연습</span>
+    </div>
+    <div class="topbar-center" id="topbar-title"></div>
+    <div class="topbar-actions">
+      <label class="provider-select" title="AI 채팅과 문제집 생성에 사용할 프로바이더/모델">
+        <select id="provider-select" aria-label="프로바이더"></select>
+        <input id="model-input" list="model-list" placeholder="모델 ID" aria-label="모델" />
+        <datalist id="model-list"></datalist>
+        <button class="btn-icon" id="btn-fetch-models" title="모델 목록 가져오기">⟳</button>
+      </label>
+      <button class="btn" id="btn-files" title="로컬 파일 탐색기">📁 파일</button>
+      <button class="btn" id="btn-doctor" title="환경 점검">🩺 Doctor</button>
+      <button class="btn" id="btn-settings" title="설정 / API 키">⚙️ 설정</button>
+      <a class="btn" href="/docs/index.html" target="_blank" title="사용 가이드">📖 가이드</a>
+    </div>
+  </header>
+
+  <main class="layout" id="layout">
+    <aside class="pane pane-left" id="pane-left">
+      <div id="sidebar"></div>
+    </aside>
+    <div class="splitter" data-target="left"></div>
+    <section class="pane pane-center" id="pane-center">
+      <div id="editor"></div>
+    </section>
+    <div class="splitter" data-target="right"></div>
+    <aside class="pane pane-right" id="pane-right">
+      <div id="chat"></div>
+    </aside>
+  </main>
+
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

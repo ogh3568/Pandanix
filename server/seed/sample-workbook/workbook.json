@@ -1,0 +1,9 @@
+{
+  "id": "wb_sample",
+  "title": "AI 활용 기초: 업무 보고서와 의사결정",
+  "description": "참고자료를 AI 와 함께 읽고, 제출 형식에 맞는 보고서를 작성하는 연습입니다. 오른쪽 AI 채팅에 자료 요약·개요 작성·초안 피드백을 요청해 보세요.",
+  "category": "업무 일반",
+  "difficulty": "초급",
+  "source": "sample",
+  "problemOrder": ["p_report", "p_decision", "p_market"]
+}
