@@ -2,7 +2,7 @@
 import { api } from './api.js';
 import { state, emit, on, prefs } from './state.js';
 import { toast } from './ui/modal.js';
-import { initSidebar, restoreLast } from './ui/sidebar.js';
+import { initSidebar, restoreLast, syncFromServer } from './ui/sidebar.js';
 import { initEditor } from './ui/editor.js';
 import { initChat } from './ui/chat.js';
 import { openSettings } from './ui/settings.js';
@@ -30,6 +30,9 @@ async function boot() {
   on('settings:changed', () => { initProviderBar(); });
   restoreLast();
   firstRunHint();
+  // 다른 탭/탐색기에서 바꾼 내용을 창에 돌아올 때 반영
+  window.addEventListener('focus', () => syncFromServer());
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromServer(); });
 }
 
 function initProviderBar() {

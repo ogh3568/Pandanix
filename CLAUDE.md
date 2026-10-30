@@ -36,7 +36,7 @@ Linux/macOS 에서도 개발·테스트는 가능하다(doctor 가 OS 경고만 
 | 오른쪽 채팅 | `public/js/ui/chat.js` |
 | 설정/Doctor/파일 탐색기 모달 | `public/js/ui/settings.js`, `doctor.js`, `filepicker.js` |
 | 프런트 API 호출 | `public/js/api.js` (fetch 는 여기서만) |
-| 샘플 문제집 | `server/seed/sample-workbook/` |
+| 내장 문제집(라이브러리) | `server/seed/library/<slug>/` (폴더 추가만으로 등록됨), 목록/설치 로직 `server/seed.js` |
 
 ## 규칙 (지켜야 할 것)
 - **의존성 최소화**: 서버는 express + 3개 공식 AI SDK 뿐. 프런트는 외부 라이브러리 없음(오프라인 동작). 새 패키지를 넣기 전에 `decisions.md` 의 ADR-2 를 읽고, 넣었다면 기록.

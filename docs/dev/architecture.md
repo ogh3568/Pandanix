@@ -27,7 +27,7 @@ server/
   app.js                   Express 구성, 라우트 마운트, 오류 핸들러, 문서 뷰어 라우트, 브라우저 자동 열기
   config.js                PROVIDERS 정의, 설정/자격증명 로드·저장·마스킹
   doctor.js / doctor-cli.js
-  seed.js + seed/sample-workbook/   첫 실행 샘플 문제집(가져오기 폴더 형식 예시)
+  seed.js + seed/library/<slug>/   내장 문제집 라이브러리(첫 실행 시 전부 설치, 가져오기 폴더 형식 예시)
   lib/paths.js             DATA_DIR, 허용 루트 검사(resolveAllowed), JSON 읽기/쓰기
   lib/store.js             문제집·문제·참고자료·답안·첨부·채팅·가져오기/내보내기
   lib/prompt.js            프롬프트 템플릿, extractJson

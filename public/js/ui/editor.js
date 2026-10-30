@@ -88,6 +88,9 @@ export function initEditor(el) {
   page.addEventListener('mouseup', tableToolbar);
 
   on('problem:selected', ({ wb, p }) => load(wb, p));
+  // 문제 수정(제목·글자 수 제한 등) 후 상단 제목과 글자 수 표시를 갱신
+  on('problem:changed', () => { if (scope.wb !== 'general') { updateCounts(); updateTitle(); } });
+  on('workbooks:changed', () => { if (scope.wb !== 'general') updateTitle(); });
   window.addEventListener('beforeunload', (e) => { if (dirty) { save(false); e.preventDefault(); e.returnValue = ''; } });
 }
 
@@ -138,10 +141,14 @@ async function load(wb, p) {
     renderAttachments();
     updateCounts();
     statusEl.querySelector('[data-saved]').textContent = state.answer.updatedAt ? `마지막 저장 ${new Date(state.answer.updatedAt).toLocaleString('ko-KR')}` : '아직 저장되지 않음';
-    document.getElementById('topbar-title').textContent = `${state.currentWorkbook?.title || ''} › ${state.currentProblem?.title || ''}`;
+    updateTitle();
   } catch (err) {
     toast(err.message, 'error');
   }
+}
+
+function updateTitle() {
+  document.getElementById('topbar-title').textContent = `${state.currentWorkbook?.title || ''} › ${state.currentProblem?.title || ''}`;
 }
 
 function scheduleSave() {

@@ -99,4 +99,4 @@ API 응답의 `references[]` 에는 파일 시스템에서 계산한 `size, ext,
 채팅 요청 시 서버는 `role` 이 user/assistant 인 최근 30개만 모델에 보낸다(오류 메시지도 assistant 로 저장되므로 필요하면 필터 추가).
 
 ## 가져오기/내보내기 형식
-문제집 폴더 그대로(`workbook.json` + `problems/<id>/problem.json` + `references/`). 가져올 때 ID 는 새로 발급되고 `references[]` 순서를 유지한다. 예시: `server/seed/sample-workbook/`.
+문제집 폴더 그대로(`workbook.json` + `problems/<id>/problem.json` + `references/`). 가져올 때 ID 는 새로 발급되고 `references[]` 순서를 유지한다. 예시: `server/seed/library/lib-basics/`. 설치된 내장 문제집은 `workbook.json` 에 `libraryId` 가 기록되어 라이브러리 화면에서 "설치됨" 으로 표시된다.

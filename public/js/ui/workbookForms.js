@@ -189,6 +189,56 @@ export function newTextReferenceDialog(wbId, pId) {
 export async function refreshWorkbooks() {
   const { workbooks } = await api.workbooks();
   state.workbooks = workbooks;
+  // 현재 선택된 문제집 요약도 최신으로 맞춘다 (문제 추가/삭제/이름 변경 반영)
+  if (state.currentWorkbook) {
+    const fresh = workbooks.find((w) => w.id === state.currentWorkbook.id);
+    if (fresh) state.currentWorkbook = fresh;
+    else {
+      state.currentWorkbook = null;
+      state.currentProblem = null;
+      emit('problem:selected', { wb: 'general', p: 'general', problem: null });
+    }
+  }
   emit('workbooks:changed', workbooks);
   return workbooks;
+}
+
+/** 내장 문제집 라이브러리 다이얼로그. 설치하면 설치된 문제집을 resolve. */
+export function libraryDialog() {
+  return new Promise((resolve) => {
+    const body = document.createElement('div');
+    body.innerHTML = '<div class="empty">불러오는 중…</div>';
+    let installedAny = null;
+    const ctx = openModal({ title: '📚 내장 문제집', body, wide: true, buttons: [{ label: '닫기' }], onClose: () => resolve(installedAny) });
+    const render = async () => {
+      const { library } = await api.library();
+      body.innerHTML = `
+        <div class="callout">앱에 포함된 연습용 문제집입니다. 설치하면 내 문제집으로 복사되어 자유롭게 수정할 수 있습니다.</div>
+        ${library
+          .map(
+            (l) => `<div class="provider-card">
+              <div class="row-between"><div><strong>${escapeHtml(l.title)}</strong>
+                <div class="problem-meta" style="margin-top:4px">${l.category ? `<span class="badge">${escapeHtml(l.category)}</span>` : ''}${l.difficulty ? `<span class="badge">${escapeHtml(l.difficulty)}</span>` : ''}<span class="badge">문제 ${l.problems.length}</span>${l.installedId ? '<span class="badge badge-ok">설치됨</span>' : ''}</div></div>
+                <div class="row">${l.installedId ? `<button class="btn btn-sm" data-install="${l.id}" data-force="1">복사본 추가</button>` : `<button class="btn btn-sm btn-primary" data-install="${l.id}">설치</button>`}</div></div>
+              <div class="small muted" style="margin:6px 0">${escapeHtml(l.description)}</div>
+              <ol class="small" style="margin:0;padding-left:20px">${l.problems.map((p) => `<li>${escapeHtml(p.title)}</li>`).join('')}</ol>
+            </div>`,
+          )
+          .join('')}`;
+      body.querySelectorAll('[data-install]').forEach((b) => (b.onclick = async () => {
+        b.disabled = true;
+        try {
+          installedAny = await api.installLibrary(b.dataset.install, b.dataset.force === '1');
+          toast(`설치했습니다: ${installedAny.title}`, 'ok');
+          await refreshWorkbooks();
+          render();
+        } catch (err) {
+          toast(err.message, 'error');
+          b.disabled = false;
+        }
+      }));
+    };
+    render().catch((err) => { body.innerHTML = `<div class="empty" style="color:var(--danger)">${escapeHtml(err.message)}</div>`; });
+    void ctx;
+  });
 }

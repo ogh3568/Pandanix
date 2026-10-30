@@ -3,7 +3,7 @@ import { api, fileToBase64 } from '../api.js';
 import { state, emit, on, prefs } from '../state.js';
 import { renderMarkdown, renderCsv, escapeHtml } from '../markdown.js';
 import { toast, confirmDialog, openModal } from './modal.js';
-import { workbookForm, problemForm, aiGenerateDialog, newTextReferenceDialog, refreshWorkbooks } from './workbookForms.js';
+import { workbookForm, problemForm, aiGenerateDialog, newTextReferenceDialog, refreshWorkbooks, libraryDialog } from './workbookForms.js';
 import { pickPath } from './filepicker.js';
 
 let root;
@@ -36,6 +36,7 @@ async function renderList() {
     <div class="wb-actions">
       <button class="btn btn-sm" data-act="new">＋ 문제집 추가</button>
       <button class="btn btn-sm btn-primary" data-act="ai">✨ AI 로 만들기</button>
+      <button class="btn btn-sm" data-act="library" title="앱에 포함된 문제집 설치">📚 내장 문제집</button>
       <button class="btn btn-sm" data-act="import" title="workbook.json 이 있는 폴더 선택">📥 가져오기</button>
       <button class="btn btn-sm" data-act="general" title="문제와 무관한 일반 채팅">💬 일반 채팅</button>
     </div>
@@ -57,6 +58,11 @@ async function renderList() {
     if (!wb) return;
     await refreshWorkbooks();
     expanded.add(wb.id);
+    renderList();
+  };
+  root.querySelector('[data-act="library"]').onclick = async () => {
+    const wb = await libraryDialog();
+    if (wb) expanded.add(wb.id);
     renderList();
   };
   root.querySelector('[data-act="import"]').onclick = async () => {
@@ -210,7 +216,7 @@ async function renderProblem() {
     const updated = await problemForm(wb.id, p);
     if (updated) {
       state.currentProblem = updated;
-      await refreshWorkbooks();
+      await refreshWorkbooks(); // 목록 제목·문제 수 갱신 → workbooks:changed
       emit('problem:changed', updated);
     }
   };
@@ -350,6 +356,31 @@ function renderReferences(body) {
 
 function iconFor(ext) {
   return { '.md': '📝', '.txt': '📄', '.csv': '📊', '.xlsx': '📊', '.xls': '📊', '.pdf': '📕', '.docx': '📘', '.pptx': '📙', '.png': '🖼', '.jpg': '🖼', '.jpeg': '🖼', '.json': '🧾' }[ext] || '📎';
+}
+
+/**
+ * 외부 변경 반영: 창이 다시 포커스될 때(다른 탭/탐색기에서 파일을 바꾼 경우) 목록과 현재 문제를 다시 읽는다.
+ * 3초 이내 중복 호출은 무시한다.
+ */
+let lastSync = 0;
+export async function syncFromServer() {
+  const now = Date.now();
+  if (now - lastSync < 3000) return;
+  lastSync = now;
+  try {
+    await refreshWorkbooks();
+    if (state.currentWorkbook && state.currentProblem) {
+      const fresh = await api.problem(state.currentWorkbook.id, state.currentProblem.id).catch(() => null);
+      if (!fresh) return selectProblem(null, null);
+      const changed = fresh.updatedAt !== state.currentProblem.updatedAt || JSON.stringify(fresh.references.map((r) => r.file + r.size)) !== JSON.stringify(state.currentProblem.references.map((r) => r.file + r.size));
+      if (changed) {
+        state.currentProblem = fresh;
+        emit('problem:changed', fresh);
+      }
+    }
+  } catch {
+    /* 서버 꺼짐 등은 무시 */
+  }
 }
 
 export function restoreLast() {

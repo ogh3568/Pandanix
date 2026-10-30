@@ -52,7 +52,7 @@ export function getWorkbook(wbId) {
   return summarizeWorkbook(wb);
 }
 
-export function createWorkbook({ title, description = '', category = '', difficulty = '', source = 'manual' }) {
+export function createWorkbook({ title, description = '', category = '', difficulty = '', source = 'manual', libraryId = null }) {
   if (!title || !String(title).trim()) throw httpError(400, '문제집 제목은 필수입니다.');
   const id = newId('wb');
   const wb = {
@@ -62,6 +62,7 @@ export function createWorkbook({ title, description = '', category = '', difficu
     category,
     difficulty,
     source,
+    libraryId: libraryId || undefined,
     createdAt: nowIso(),
     updatedAt: nowIso(),
     problemOrder: [],
@@ -355,10 +356,10 @@ export function clearChat(wbId, pId) {
 
 // ---------- 가져오기 / 내보내기 ----------
 /** 폴더(workbook.json 포함)를 새 문제집으로 복사해 가져온다. */
-export function importWorkbookFromDir(srcDir) {
+export function importWorkbookFromDir(srcDir, { libraryId = null, source = 'import' } = {}) {
   const src = readJson(path.join(srcDir, 'workbook.json'), null);
   if (!src) throw httpError(400, '선택한 폴더에 workbook.json 이 없습니다.');
-  const wb = createWorkbook({ ...src, source: src.source === 'sample' ? 'sample' : 'import' });
+  const wb = createWorkbook({ ...src, source, libraryId });
   for (const pId of src.problemOrder || []) {
     const pSrc = readJson(path.join(srcDir, 'problems', pId, 'problem.json'), null);
     if (!pSrc) continue;

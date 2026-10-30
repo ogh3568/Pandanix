@@ -5,6 +5,7 @@ import * as store from '../lib/store.js';
 import { wrap } from '../lib/async.js';
 import { httpError, resolveAllowed } from '../lib/paths.js';
 import { getAllowedRoots } from '../config.js';
+import { listLibrary, installLibraryWorkbook } from '../seed.js';
 
 export const workbooksRouter = Router();
 
@@ -51,6 +52,10 @@ workbooksRouter.get('/workbooks/:wb/problems/:p/references/:file', (req, res) =>
 workbooksRouter.delete('/workbooks/:wb/problems/:p/references/:file', (req, res) => {
   res.json(store.removeReferenceFile(req.params.wb, req.params.p, req.params.file));
 });
+
+/** 내장 문제집 라이브러리 */
+workbooksRouter.get('/library', (req, res) => res.json({ library: listLibrary() }));
+workbooksRouter.post('/library/:slug/install', (req, res) => res.status(201).json(installLibraryWorkbook(req.params.slug, { force: Boolean(req.body?.force) })));
 
 /** 폴더에서 문제집 가져오기 { path } */
 workbooksRouter.post('/workbooks/import', (req, res) => {

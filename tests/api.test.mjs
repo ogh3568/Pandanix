@@ -46,12 +46,30 @@ after(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-test('샘플 문제집이 시드된다', async () => {
+test('내장 문제집이 모두 시드된다', async () => {
   const { data } = await j('GET', '/api/workbooks');
-  assert.equal(data.workbooks.length, 1);
-  assert.equal(data.workbooks[0].problems.length, 3);
-  const p = await j('GET', `/api/workbooks/${data.workbooks[0].id}/problems/${data.workbooks[0].problems[0].id}`);
+  const lib = (await j('GET', '/api/library')).data.library;
+  assert.ok(lib.length >= 1);
+  assert.equal(data.workbooks.length, lib.length);
+  assert.ok(lib.every((l) => l.installedId));
+  const basics = data.workbooks.find((w) => w.libraryId === 'lib-basics');
+  assert.equal(basics.problems.length, 3);
+  const p = await j('GET', `/api/workbooks/${basics.id}/problems/${basics.problems[0].id}`);
   assert.deepEqual(p.data.references.map((r) => r.file), ['설비정보.md', '고장이력_2025.csv', '신규설비_견적.md']);
+  // 모든 내장 문제의 참고자료 파일이 실제로 존재하고 텍스트로 읽힌다
+  for (const w of data.workbooks) for (const pr of w.problems) {
+    const d = (await j('GET', `/api/workbooks/${w.id}/problems/${pr.id}`)).data;
+    assert.ok(d.references.length >= 1, `${w.title} / ${pr.title} 참고자료 없음`);
+    assert.ok(d.prompt.length > 50 && d.submission.format.length > 5, `${w.title} / ${pr.title} 지문/형식 부족`);
+  }
+});
+
+test('내장 문제집 재설치는 409, force 면 복사본', async () => {
+  assert.equal((await j('POST', '/api/library/lib-basics/install', {})).status, 409);
+  const copy = (await j('POST', '/api/library/lib-basics/install', { force: true })).data;
+  assert.equal(copy.libraryId, 'lib-basics');
+  assert.equal((await j('DELETE', `/api/workbooks/${copy.id}`)).status, 200);
+  assert.equal((await j('POST', '/api/library/nope/install', {})).status, 404);
 });
 
 test('문제집/문제/참고자료 CRUD', async () => {

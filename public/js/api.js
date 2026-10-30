@@ -39,6 +39,8 @@ export const api = {
   updateWorkbook: (wb, data) => request('PUT', `/api/workbooks/${wb}`, data),
   deleteWorkbook: (wb) => request('DELETE', `/api/workbooks/${wb}`),
   importWorkbook: (path) => request('POST', '/api/workbooks/import', { path }),
+  library: () => request('GET', '/api/library'),
+  installLibrary: (slug, force = false) => request('POST', `/api/library/${slug}/install`, { force }),
   exportWorkbook: (wb, path) => request('POST', `/api/workbooks/${wb}/export`, { path }),
   problem: (wb, p) => request('GET', `/api/workbooks/${wb}/problems/${p}`),
   createProblem: (wb, data) => request('POST', `/api/workbooks/${wb}/problems`, data),
