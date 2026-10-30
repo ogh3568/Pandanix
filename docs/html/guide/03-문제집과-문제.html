@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>3. 문제집과 문제 · Pandanix 가이드</title>
 <link rel="stylesheet" href="../assets/guide.css" />
+<script>(function(){try{var t=localStorage.getItem('pandanix:theme');if(t==='"light"'||t==='"dark"')document.documentElement.setAttribute('data-theme',JSON.parse(t));var mq=window.matchMedia('(prefers-color-scheme: dark)');var a=function(){document.documentElement.classList.toggle('system-dark',mq.matches)};a();mq.addEventListener&&mq.addEventListener('change',a)}catch(e){}})();</script>
 </head>
 <body>
 <div class="docs">
   <nav class="docs-nav">
-    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span><button class="btn-icon" id="btn-theme" title="테마 전환" style="margin-left:auto" onclick="(function(b){var o=['system','light','dark'],k='pandanix:theme',t='system';try{var v=JSON.parse(localStorage.getItem(k));if(v==='light'||v==='dark')t=v}catch(e){}var n=o[(o.indexOf(t)+1)%3];var r=document.documentElement;if(n==='system'){r.removeAttribute('data-theme');localStorage.removeItem(k)}else{r.setAttribute('data-theme',n);localStorage.setItem(k,JSON.stringify(n))}b.textContent={system:'🌓',light:'☀️',dark:'🌙'}[n]})(this)">🌓</button></div>
     <h3>시작하기</h3><a href="../quick-start.html" class="">퀵 스타트 (5분)</a><h3>사용 가이드</h3><a href="../guide/01-설치와-실행.html" class="">1. 설치와 실행</a><a href="../guide/02-API-키-설정.html" class="">2. API 키 설정</a><a href="../guide/03-문제집과-문제.html" class="active">3. 문제집과 문제</a><a href="../guide/04-답안-작성.html" class="">4. 답안 작성 (가운데 에디터)</a><a href="../guide/05-AI-채팅.html" class="">5. AI 채팅 (오른쪽 패널)</a><a href="../guide/06-AI로-문제집-만들기.html" class="">6. AI 로 문제집 만들기</a><a href="../guide/07-파일-탐색기.html" class="">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a><a href="../guide/08-Doctor.html" class="">8. Doctor (환경 점검)</a><a href="../guide/09-FAQ-문제해결.html" class="">9. FAQ · 문제 해결</a><details ><summary>개발/유지보수</summary><a href="../dev/api.html" class="">API 레퍼런스</a><a href="../dev/architecture.html" class="">아키텍처 (개발자/AI 용)</a><a href="../dev/changelog.html" class="">변경 이력</a><a href="../dev/data-model.html" class="">데이터 모델</a><a href="../dev/decisions.html" class="">설계 결정 기록 (ADR)</a><a href="../dev/frontend.html" class="">프런트엔드 메모</a><a href="../dev/maintenance.html" class="">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a><a href="../dev/providers.html" class="">AI 프로바이더</a></details>
   </nav>
   <main class="docs-main">

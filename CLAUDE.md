@@ -36,7 +36,8 @@ Node 22 이상 필수(openai SDK). Linux/macOS 에서도 개발·테스트는 �
 | 저장 구조(문제집/답안/채팅 파일) | `server/lib/store.js` |
 | API 라우트 | `server/routes/*.js` (settings, workbooks, answers, chat, generate, fs, doctor) |
 | 환경 점검 항목 | `server/doctor.js` (서버·CLI 공용) |
-| 화면 레이아웃/스타일 | `public/index.html`, `public/css/app.css` (색·간격은 `:root` 변수) |
+| 화면 레이아웃/스타일 | `public/index.html`, `public/css/app.css` (색·간격은 `:root` 변수, 다크 모드는 `[data-theme="dark"]`/`.system-dark` 블록) |
+| 테마 토글 | `public/js/theme.js` (상단바 🌓, localStorage `pandanix:theme`) |
 | 왼쪽 패널(문제집/문제) | `public/js/ui/sidebar.js`, 폼: `public/js/ui/workbookForms.js` |
 | 가운데 에디터 | `public/js/ui/editor.js` |
 | 오른쪽 채팅 | `public/js/ui/chat.js` |

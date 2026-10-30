@@ -213,10 +213,11 @@ async function main() {
       { sel: '#provider-select', n: 2 },
       { sel: '#model-input', n: 3 },
       { sel: '#btn-fetch-models', n: 4 },
-      { sel: '#btn-files', n: 5 },
-      { sel: '#btn-doctor', n: 6 },
-      { sel: '#btn-settings', n: 7 },
-      { sel: 'a[href="/docs/index.html"]', n: 8 },
+      { sel: '#btn-theme', n: 5 },
+      { sel: '#btn-files', n: 6 },
+      { sel: '#btn-doctor', n: 7 },
+      { sel: '#btn-settings', n: 8 },
+      { sel: 'a[href="/docs/index.html"]', n: 9 },
     ],
   });
 
@@ -486,7 +487,18 @@ async function main() {
     await page.selectOption('#provider-select', 'openai');
   });
   await step('20. 문서 뷰어', async () => {
-    // 20. 문서 뷰어
+    // 20. 다크 모드
+  await step('다크 모드', async () => {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.evaluate(() => localStorage.setItem('pandanix:theme', JSON.stringify('dark')));
+    await page.reload({ waitUntil: 'networkidle' });
+    await sleep(500);
+    await openFirstProblem(page, basics.title, 0);
+    await shot(page, 'theme-dark.png', { marks: [{ sel: '#btn-theme', n: 1, label: '테마 전환: 시스템 → 라이트 → 다크', labelPos: 'bl' }] });
+    await page.evaluate(() => localStorage.removeItem('pandanix:theme'));
+  });
+
+  // 21. 문서 뷰어
     await page.goto(BASE + '/docs/', { waitUntil: 'networkidle' });
     await sleep(400);
     await shot(page, 'docs-viewer.png', { marks: [{ sel: '.docs-nav', n: 1, label: '문서 목차 (개발 문서는 접힘)', labelPos: 'inside' }, { sel: '.docs-main', n: 2, label: '본문', labelPos: 'inside' }] });

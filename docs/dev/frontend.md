@@ -1,7 +1,7 @@
 # 프런트엔드 메모
 
 - 빌드 도구 없음. `public/js/*.js` 는 브라우저 ES 모듈. 외부 라이브러리 없음 → 오프라인 동작, 보안 업데이트 부담 없음.
-- 스타일은 `public/css/app.css` 하나. 색/간격/폰트는 `:root` 변수. 레이아웃은 CSS grid 3열(`--left-w`, `--right-w`), 스플리터로 조절(localStorage 저장).
+- 스타일은 `public/css/app.css` 하나. 색/간격/폰트는 `:root` 변수. **다크 모드**는 같은 변수를 `:root[data-theme="dark"]`(수동)과 `.system-dark`(시스템 설정)에서 덮어쓴다. 새 색을 쓸 때는 hex 를 직접 쓰지 말고 토큰(`--panel`, `--input-bg`, `--ok-bg/--ok-fg`, `--danger-bg/--danger-fg` …)을 쓴다. 토글·저장은 `public/js/theme.js`, 깜빡임 방지 초기화는 각 HTML `<head>` 의 인라인 스크립트(index.html, docs-viewer.html, build-docs-html.mjs 템플릿). 레이아웃은 CSS grid 3열(`--left-w`, `--right-w`), 스플리터로 조절(localStorage 저장).
 - 상태: `state.js` 의 단일 객체 + `on/emit` 이벤트. 패널 간 직접 참조 대신 이벤트 사용(목록은 `architecture.md`).
 - 모든 서버 호출은 `api.js`. 새 엔드포인트를 쓰려면 여기에 함수 추가.
 - 팝업은 `ui/modal.js` 의 `openModal / confirmDialog / promptDialog / toast` 만 사용. 폼은 `field/input/textarea/formValues` 도우미.

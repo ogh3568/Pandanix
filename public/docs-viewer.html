@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pandanix 가이드</title>
   <link rel="stylesheet" href="/css/app.css" />
+  <script>
+    // 테마 초기화: 화면이 그려지기 전에 적용해 깜빡임을 막는다. 값: 'light' | 'dark' | 없음(시스템)
+    (function () {
+      try {
+        var t = localStorage.getItem('pandanix:theme');
+        if (t === '"light"' || t === '"dark"') document.documentElement.setAttribute('data-theme', JSON.parse(t));
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        var apply = function () { document.documentElement.classList.toggle('system-dark', mq.matches); };
+        apply(); mq.addEventListener && mq.addEventListener('change', apply);
+      } catch (e) {}
+    })();
+  </script>
   <style>
     body { overflow: auto; }
     .docs { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
@@ -24,7 +36,7 @@
 </head>
 <body>
   <div class="docs">
-    <nav class="docs-nav"><div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span></div><div id="nav"></div><p class="small muted" style="margin-top:20px"><a href="/">← 앱으로</a></p></nav>
+    <nav class="docs-nav"><div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><button class="btn-icon" id="btn-theme" title="테마 전환" style="margin-left:auto">🌓</button></div><div id="nav"></div><p class="small muted" style="margin-top:20px"><a href="/">← 앱으로</a></p></nav>
     <main class="docs-main"><div class="prose" id="content">불러오는 중…</div></main>
   </div>
   <script type="module">
@@ -63,6 +75,8 @@
     }
     window.addEventListener('hashchange', show);
     show();
+    const { initThemeToggle } = await import('/js/theme.js');
+    initThemeToggle(document.getElementById('btn-theme'));
   </script>
 </body>
 </html>

@@ -6,6 +6,18 @@
   <title>Pandanix · AI 활용 연습</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐼</text></svg>" />
   <link rel="stylesheet" href="/css/app.css" />
+  <script>
+    // 테마 초기화: 화면이 그려지기 전에 적용해 깜빡임을 막는다. 값: 'light' | 'dark' | 없음(시스템)
+    (function () {
+      try {
+        var t = localStorage.getItem('pandanix:theme');
+        if (t === '"light"' || t === '"dark"') document.documentElement.setAttribute('data-theme', JSON.parse(t));
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        var apply = function () { document.documentElement.classList.toggle('system-dark', mq.matches); };
+        apply(); mq.addEventListener && mq.addEventListener('change', apply);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <header class="topbar">
@@ -22,6 +34,7 @@
         <datalist id="model-list"></datalist>
         <button class="btn-icon" id="btn-fetch-models" title="모델 목록 가져오기">⟳</button>
       </label>
+      <button class="btn-icon" id="btn-theme" title="테마 전환 (시스템 / 라이트 / 다크)" aria-label="테마 전환">🌓</button>
       <button class="btn" id="btn-files" title="로컬 파일 탐색기">📁 파일</button>
       <button class="btn" id="btn-doctor" title="환경 점검">🩺 Doctor</button>
       <button class="btn" id="btn-settings" title="설정 / API 키">⚙️ 설정</button>

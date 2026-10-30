@@ -85,11 +85,12 @@ for (let i = 0; i < files.length; i++) {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(f.title)} · Pandanix 가이드</title>
 <link rel="stylesheet" href="${toRoot}assets/guide.css" />
+<script>(function(){try{var t=localStorage.getItem('pandanix:theme');if(t==='"light"'||t==='"dark"')document.documentElement.setAttribute('data-theme',JSON.parse(t));var mq=window.matchMedia('(prefers-color-scheme: dark)');var a=function(){document.documentElement.classList.toggle('system-dark',mq.matches)};a();mq.addEventListener&&mq.addEventListener('change',a)}catch(e){}})();</script>
 </head>
 <body>
 <div class="docs">
   <nav class="docs-nav">
-    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span><button class="btn-icon" id="btn-theme" title="테마 전환" style="margin-left:auto" onclick="(function(b){var o=['system','light','dark'],k='pandanix:theme',t='system';try{var v=JSON.parse(localStorage.getItem(k));if(v==='light'||v==='dark')t=v}catch(e){}var n=o[(o.indexOf(t)+1)%3];var r=document.documentElement;if(n==='system'){r.removeAttribute('data-theme');localStorage.removeItem(k)}else{r.setAttribute('data-theme',n);localStorage.setItem(k,JSON.stringify(n))}b.textContent={system:'🌓',light:'☀️',dark:'🌙'}[n]})(this)">🌓</button></div>
     ${nav}
   </nav>
   <main class="docs-main">

@@ -10,6 +10,7 @@ import { openDoctor } from './ui/doctor.js';
 import { openFileExplorer } from './ui/filepicker.js';
 import { refreshWorkbooks } from './ui/workbookForms.js';
 import { escapeHtml } from './markdown.js';
+import { initThemeToggle, getTheme } from './theme.js';
 import { openMenu } from './ui/modal.js';
 
 async function boot() {
@@ -25,6 +26,8 @@ async function boot() {
   initEditor(document.getElementById('editor'));
   await initChat(document.getElementById('chat'));
   initLayout();
+  initThemeToggle(document.getElementById('btn-theme'));
+  document.getElementById('btn-theme').addEventListener('themechange', (e) => toast({ system: '시스템 설정을 따릅니다.', light: '라이트 모드', dark: '다크 모드' }[e.detail], 'ok', 1200));
   document.getElementById('btn-settings').onclick = () => openSettings();
   document.getElementById('btn-doctor').onclick = () => openDoctor();
   document.getElementById('btn-files').onclick = () => openFileExplorer();
