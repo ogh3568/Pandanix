@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>퀵 스타트 (5분) · Pandanix 가이드</title>
+<link rel="stylesheet" href="assets/guide.css" />
+</head>
+<body>
+<div class="docs">
+  <nav class="docs-nav">
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <h3>시작하기</h3><a href="quick-start.html" class="active">퀵 스타트 (5분)</a><h3>사용 가이드</h3><a href="guide/01-설치와-실행.html" class="">1. 설치와 실행</a><a href="guide/02-API-키-설정.html" class="">2. API 키 설정</a><a href="guide/03-문제집과-문제.html" class="">3. 문제집과 문제</a><a href="guide/04-답안-작성.html" class="">4. 답안 작성 (가운데 에디터)</a><a href="guide/05-AI-채팅.html" class="">5. AI 채팅 (오른쪽 패널)</a><a href="guide/06-AI로-문제집-만들기.html" class="">6. AI 로 문제집 만들기</a><a href="guide/07-파일-탐색기.html" class="">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a><a href="guide/08-Doctor.html" class="">8. Doctor (환경 점검)</a><a href="guide/09-FAQ-문제해결.html" class="">9. FAQ · 문제 해결</a><details ><summary>개발/유지보수</summary><a href="dev/api.html" class="">API 레퍼런스</a><a href="dev/architecture.html" class="">아키텍처 (개발자/AI 용)</a><a href="dev/changelog.html" class="">변경 이력</a><a href="dev/data-model.html" class="">데이터 모델</a><a href="dev/decisions.html" class="">설계 결정 기록 (ADR)</a><a href="dev/frontend.html" class="">프런트엔드 메모</a><a href="dev/maintenance.html" class="">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a><a href="dev/providers.html" class="">AI 프로바이더</a></details>
+  </nav>
+  <main class="docs-main">
+    <article class="prose"><h1 id="퀵-스타트-5분">퀵 스타트 (5분)</h1>
+<blockquote><p>목표: 앱을 실행하고, API 키를 넣고, 내장 문제 하나를 AI 와 함께 풀어 보기. (Node 설치와 API 키 발급 시간은 제외)</p></blockquote>
+<p><img src="../images/overview.png" alt="화면 구성" loading="lazy"><br><em>화면은 네 영역입니다: ① 상단바(프로바이더/모델, 파일, Doctor, 설정, 가이드) ② 문제 패널 ③ 답안 작성란 ④ AI 채팅</em></p>
+<h2 id="1-준비물">1. 준비물</h2>
+<table><thead><tr><th>항목</th><th>확인 방법</th></tr></thead><tbody><tr><td>Windows 10/11</td><td>—</td></tr><tr><td>Node.js 22 이상</td><td>명령 프롬프트에서 <code>node -v</code> → <code>v22</code> 이상이면 OK. 없으면 <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a> 에서 <strong>LTS</strong> 설치</td></tr><tr><td>AI API 키 1개 이상</td><td>프로바이더(AI 회사) 중 하나: Claude / GPT / Gemini / OpenCode. 발급 링크는 설정 화면에 있음</td></tr></tbody></table>
+<h2 id="2-실행">2. 실행</h2>
+<ol><li>프로젝트 폴더에서 <strong><code>start.bat</code></strong> 더블클릭</li><li>처음엔 자동으로 <code>npm install</code> 이 돌고(1~2분), 끝나면 브라우저가 열립니다</li><li>안 열리면 직접 주소 입력: <code>http://localhost:3210</code></li></ol>
+<blockquote><p>검은 창(서버)은 닫지 마세요. 닫으면 앱이 종료됩니다.</p></blockquote>
+<h2 id="3-api-키-입력">3. API 키 입력</h2>
+<ol><li>오른쪽 위 <strong>⚙️ 설정</strong> → <strong>🔑 API 키</strong></li><li>사용할 프로바이더 칸에 키 붙여넣기 → <strong>저장</strong> → <strong>연결 테스트</strong> 로 ✔ 확인</li><li>상단바의 프로바이더/모델 선택에서 방금 설정한 프로바이더 선택. OpenCode·사용자 정의는 기본 모델이 없으므로 <strong>⟳ 버튼으로 목록을 불러와 모델을 꼭 고르세요</strong></li></ol>
+<p><img src="../images/settings-keys.png" alt="설정 &gt; API 키" loading="lazy"><br><em>① 설정 메뉴 ② 키 입력 ③ 저장 ④ 연결 테스트 ⑤ 설정 상태</em></p>
+<p>키는 <code>data/config/credentials.json</code> 에만 저장되고 git 에는 올라가지 않습니다.</p>
+<h2 id="4-첫-문제-풀기">4. 첫 문제 풀기</h2>
+<ol><li>왼쪽 <strong>문제집</strong> 목록에서 <code>AI 활용 기초: 업무 보고서와 의사결정</code> 펼치기 → 1번 문제 클릭 (내장 문제집 10종이 미리 설치되어 있습니다)</li><li>왼쪽 탭에서 <strong>지문 → 제출 형식 → 참고자료</strong> 순서로 읽기 (참고자료 이름을 클릭하면 미리보기)</li><li>오른쪽 채팅에서 <strong>📊 자료 요약</strong> 버튼 클릭 → AI 가 참고자료를 요약</li><li>답변 아래 <strong>답안에 삽입</strong> 을 누르면 가운데 에디터로 들어갑니다</li><li>답안을 다듬고, <strong>✅ 답안 피드백</strong> 으로 평가 받기</li><li>끝나면 에디터 상단 <strong>○ 작성 중</strong> 을 눌러 <strong>✔ 완료</strong> 로 표시</li></ol>
+<p><img src="../images/chat.png" alt="채팅에서 자료 요약 받기" loading="lazy"><br><em>② 빠른 작업 버튼으로 요약을 받고 ③ 답안에 삽입 으로 가운데 에디터에 넣습니다</em></p>
+<h2 id="5-문제가-생기면">5. 문제가 생기면</h2>
+<ul><li>🩺 <strong>Doctor</strong> 버튼 → 실패(❌) 항목의 안내대로 조치 → <strong>다시 검사</strong></li><li>그래도 안 되면 <a href="guide/09-FAQ-문제해결.html">FAQ·문제 해결</a></li></ul>
+<h2 id="다음-단계">다음 단계</h2>
+<ul><li><a href="guide/06-AI로-문제집-만들기.html">AI 로 문제집 만들기</a> — 우리 팀 업무에 맞는 문제집 자동 생성</li><li><a href="guide/07-파일-탐색기.html">파일 접근 설정</a> — 내 문서 폴더의 자료를 참고자료로 쓰기</li></ul></article>
+    <div class="docs-foot">
+      <span></span>
+      <span><a href="guide/01-설치와-실행.html">1. 설치와 실행</a> →</span>
+    </div>
+  </main>
+</div>
+</body>
+</html>

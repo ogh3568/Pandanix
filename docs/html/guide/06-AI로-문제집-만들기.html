@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>6. AI 로 문제집 만들기 · Pandanix 가이드</title>
+<link rel="stylesheet" href="../assets/guide.css" />
+</head>
+<body>
+<div class="docs">
+  <nav class="docs-nav">
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <h3>시작하기</h3><a href="../quick-start.html" class="">퀵 스타트 (5분)</a><h3>사용 가이드</h3><a href="../guide/01-설치와-실행.html" class="">1. 설치와 실행</a><a href="../guide/02-API-키-설정.html" class="">2. API 키 설정</a><a href="../guide/03-문제집과-문제.html" class="">3. 문제집과 문제</a><a href="../guide/04-답안-작성.html" class="">4. 답안 작성 (가운데 에디터)</a><a href="../guide/05-AI-채팅.html" class="">5. AI 채팅 (오른쪽 패널)</a><a href="../guide/06-AI로-문제집-만들기.html" class="active">6. AI 로 문제집 만들기</a><a href="../guide/07-파일-탐색기.html" class="">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a><a href="../guide/08-Doctor.html" class="">8. Doctor (환경 점검)</a><a href="../guide/09-FAQ-문제해결.html" class="">9. FAQ · 문제 해결</a><details ><summary>개발/유지보수</summary><a href="../dev/api.html" class="">API 레퍼런스</a><a href="../dev/architecture.html" class="">아키텍처 (개발자/AI 용)</a><a href="../dev/changelog.html" class="">변경 이력</a><a href="../dev/data-model.html" class="">데이터 모델</a><a href="../dev/decisions.html" class="">설계 결정 기록 (ADR)</a><a href="../dev/frontend.html" class="">프런트엔드 메모</a><a href="../dev/maintenance.html" class="">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a><a href="../dev/providers.html" class="">AI 프로바이더</a></details>
+  </nav>
+  <main class="docs-main">
+    <article class="prose"><h1 id="6-ai-로-문제집-만들기">6. AI 로 문제집 만들기</h1>
+<p>주제만 입력하면 AI 가 <strong>문제 지문 + 제출 형식 + 참고자료(md/csv) + 힌트 + 평가 기준</strong>을 한 번에 만들어 줍니다.</p>
+<h2 id="절차">절차</h2>
+<ol><li>상단바에서 사용할 프로바이더/모델 선택 (긴 JSON 을 안정적으로 쓰는 상위 모델 권장)</li><li>왼쪽 <strong>✨ AI 로 만들기</strong></li><li>아래 입력값을 채우기</li><li><strong>✨ 생성 시작</strong> → 진행 상황(수신 글자 수) 표시 → 완료되면 목록에 추가됨</li><li>생성된 문제를 열어 지문·자료를 검토하고 필요하면 ✏️ 로 수정</li></ol>
+<h2 id="입력값">입력값</h2>
+<p><img src="../../images/ai-generate.png" alt="AI 로 문제집 만들기" loading="lazy"><br><em>① 사용될 프로바이더/모델 ② 주제 ③ 문제 수 ④ 난이도 ⑤ 추가 요구사항 ⑥ 생성 시작</em></p>
+<table><thead><tr><th>항목</th><th>예</th></tr></thead><tbody><tr><td>주제/분야</td><td>중소 제조기업 생산관리 보고서 작성</td></tr><tr><td>문제 수</td><td>3 (1~10)</td></tr><tr><td>난이도</td><td>초급 / 중급 / 고급</td></tr><tr><td>대상 학습자</td><td>입사 1~3년차 사무직</td></tr><tr><td>추가 요구사항</td><td>참고자료에 CSV 매출 데이터 포함, 모든 문제 1000자 제한</td></tr></tbody></table>
+<h2 id="기존-문제집에-문제-추가">기존 문제집에 문제 추가</h2>
+<p>문제집 <strong>⋯ 메뉴 → ✨ AI 로 문제 추가</strong>. 같은 입력 폼이며 결과가 해당 문제집 뒤에 붙습니다.</p>
+<h2 id="시간과-비용">시간과 비용</h2>
+<ul><li>문제 1개당 참고자료 2~4개가 생성되어 출력이 깁니다 (문제 3개 ≈ 1~2만 토큰 출력)</li><li>1~3분 걸릴 수 있습니다. 창을 닫으면 취소됩니다</li></ul>
+<h2 id="결과가-이상할-때">결과가 이상할 때</h2>
+<table><thead><tr><th>증상</th><th>원인/조치</th></tr></thead><tbody><tr><td>&quot;응답에서 JSON 을 찾지 못했습니다&quot;</td><td>모델이 JSON 형식을 어김. 더 큰 모델로 재시도하거나 문제 수를 줄이기</td></tr><tr><td>참고자료 수치가 서로 안 맞음</td><td>생성 특성. 문제를 열어 자료를 직접 수정 (참고자료 탭 → 삭제 후 텍스트 자료 작성)</td></tr><tr><td>너무 쉬움/어려움</td><td>난이도와 &quot;추가 요구사항&quot; 에 구체적으로 적기 (예: &quot;자료 간 상충 정보 포함&quot;)</td></tr></tbody></table>
+<h2 id="관리자-프롬프트-바꾸기">(관리자) 프롬프트 바꾸기</h2>
+<p>생성 지시문은 <code>server/lib/prompt.js</code> 의 <code>buildWorkbookGenerationPrompt</code> 입니다. JSON 스키마를 바꾸면 <code>server/routes/generate.js</code> 의 <code>saveGenerated</code> 도 맞춰야 합니다.</p></article>
+    <div class="docs-foot">
+      <span>← <a href="../guide/05-AI-채팅.html">5. AI 채팅 (오른쪽 패널)</a></span>
+      <span><a href="../guide/07-파일-탐색기.html">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a> →</span>
+    </div>
+  </main>
+</div>
+</body>
+</html>

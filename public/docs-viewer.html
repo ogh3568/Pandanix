@@ -17,6 +17,8 @@
     .docs-main .prose h2 { font-size: 1.35em; margin-top: 1.6em; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
     .docs-main .prose pre { font-size: 12.5px; }
     .docs-main .prose table { font-size: 13.5px; }
+    .docs-main .prose img { max-width: 100%; border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); margin: 8px 0 4px; }
+    .docs-main .prose img + em, .docs-main .prose p > em:only-child { display: block; color: var(--muted); font-size: 12.5px; }
     @media (max-width: 800px) { .docs { grid-template-columns: 1fr; } .docs-nav { position: static; height: auto; } }
   </style>
 </head>
@@ -48,7 +50,8 @@
       // 상대 .md 링크 → 뷰어 해시, 같은 문서 안의 #앵커 → 현재 문서 경로 + 앵커
       content.innerHTML = renderMarkdown(md)
         .replace(/href="(?!https?:|#)([^"#]+\.md)(#[^"]*)?"/g, (m, p, a) => `href="#${resolve(path, p)}${a || ''}"`)
-        .replace(/href="#(?!\S*\.md)([^"]+)"/g, (m, a) => `href="#${path}#${a}"`);
+        .replace(/href="#(?!\S*\.md)([^"]+)"/g, (m, a) => `href="#${path}#${a}"`)
+        .replace(/src="(?!https?:|data:|\/)([^"]+)"/g, (m, p) => `src="/docs/${resolve(path, p)}"`);
       const target = anchor && document.getElementById(anchor);
       if (target) target.scrollIntoView();
       else window.scrollTo(0, 0);

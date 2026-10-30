@@ -2,7 +2,7 @@
 import { api, fileToBase64, connection } from '../api.js';
 import { state, on, emit, prefs } from '../state.js';
 import { escapeHtml, renderMarkdown } from '../markdown.js';
-import { toast, openModal, confirmDialog, promptDialog } from './modal.js';
+import { toast, openModal, confirmDialog, promptDialog, openMenu } from './modal.js';
 import { pickPath } from './filepicker.js';
 
 let root, page, statusEl, scope = { wb: 'general', p: 'general' };
@@ -508,14 +508,8 @@ function exportMenu(e) {
     ['HTML 을 로컬 폴더에 저장…', () => saveTo('html')],
     ['본문을 클립보드에 복사 (Markdown)', async () => { await save(false); const blob = await api.exportAnswerBlob(scope.wb, scope.p, 'md'); await navigator.clipboard.writeText(await blob.text()); toast('복사했습니다.', 'ok'); }],
   ];
-  const pop = document.createElement('div');
-  pop.className = 'popover';
   const r = e.currentTarget.getBoundingClientRect();
-  pop.style.cssText = `left:${Math.min(r.left, window.innerWidth - 300)}px;top:${r.bottom + 4}px;min-width:260px;padding:4px`;
-  pop.innerHTML = items.map(([l], i) => `<div class="wb-problem" data-i="${i}" style="padding:7px 12px">${l}</div>`).join('');
-  document.body.appendChild(pop);
-  pop.addEventListener('click', async (ev) => { const it = ev.target.closest('[data-i]'); pop.remove(); if (it) await items[it.dataset.i][1]().catch((err) => toast(err.message, 'error')); });
-  setTimeout(() => document.addEventListener('mousedown', function h(ev) { if (!pop.contains(ev.target)) { pop.remove(); document.removeEventListener('mousedown', h); } }), 0);
+  openMenu({ x: Math.min(r.left, window.innerWidth - 300), y: r.bottom + 4, minWidth: 280, items });
 }
 async function download(format) {
   if (scope.wb === 'general') return toast('먼저 문제를 선택하세요.', 'error');

@@ -11,6 +11,9 @@
 | `doctor.bat --live` / `npm run doctor:live` | API 연결 테스트 포함 |
 | `node server/doctor-cli.js --json` | JSON 출력 (스크립트용) |
 
+![Doctor 화면](../images/doctor.png)
+*① 요약 ② 점검 항목(실패 → 주의 → 정상 순, 조치 안내와 설정 열기 버튼) ③ 결과 복사 · 설정 열기 · 다시 검사 · 실시간 API 테스트*
+
 ## 점검 항목
 
 | 항목 | 실패 시 조치 |

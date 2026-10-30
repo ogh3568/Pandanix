@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>5. AI 채팅 (오른쪽 패널) · Pandanix 가이드</title>
+<link rel="stylesheet" href="../assets/guide.css" />
+</head>
+<body>
+<div class="docs">
+  <nav class="docs-nav">
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <h3>시작하기</h3><a href="../quick-start.html" class="">퀵 스타트 (5분)</a><h3>사용 가이드</h3><a href="../guide/01-설치와-실행.html" class="">1. 설치와 실행</a><a href="../guide/02-API-키-설정.html" class="">2. API 키 설정</a><a href="../guide/03-문제집과-문제.html" class="">3. 문제집과 문제</a><a href="../guide/04-답안-작성.html" class="">4. 답안 작성 (가운데 에디터)</a><a href="../guide/05-AI-채팅.html" class="active">5. AI 채팅 (오른쪽 패널)</a><a href="../guide/06-AI로-문제집-만들기.html" class="">6. AI 로 문제집 만들기</a><a href="../guide/07-파일-탐색기.html" class="">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a><a href="../guide/08-Doctor.html" class="">8. Doctor (환경 점검)</a><a href="../guide/09-FAQ-문제해결.html" class="">9. FAQ · 문제 해결</a><details ><summary>개발/유지보수</summary><a href="../dev/api.html" class="">API 레퍼런스</a><a href="../dev/architecture.html" class="">아키텍처 (개발자/AI 용)</a><a href="../dev/changelog.html" class="">변경 이력</a><a href="../dev/data-model.html" class="">데이터 모델</a><a href="../dev/decisions.html" class="">설계 결정 기록 (ADR)</a><a href="../dev/frontend.html" class="">프런트엔드 메모</a><a href="../dev/maintenance.html" class="">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a><a href="../dev/providers.html" class="">AI 프로바이더</a></details>
+  </nav>
+  <main class="docs-main">
+    <article class="prose"><h1 id="5-ai-채팅-오른쪽-패널">5. AI 채팅 (오른쪽 패널)</h1>
+<h2 id="기본-사용">기본 사용</h2>
+<p><img src="../../images/chat.png" alt="AI 채팅 패널" loading="lazy"></p>
+<table><thead><tr><th>번호</th><th>항목</th><th>설명</th></tr></thead><tbody><tr><td>1</td><td>🗑</td><td>이 문제의 대화 기록 지우기</td></tr><tr><td>2</td><td>빠른 작업</td><td>개요 제안 · 자료 요약 · 답안 피드백 · 문장 다듬기 · 질문 거리</td></tr><tr><td>3</td><td>복사 / 답안에 삽입</td><td>응답을 클립보드로, 또는 가운데 에디터 커서 위치에 삽입(표 포함)</td></tr><tr><td>4</td><td>컨텍스트 선택</td><td>지문 · 참고자료 · 내 답안을 AI 에게 함께 보낼지</td></tr><tr><td>5</td><td>입력란</td><td>질문 입력, Ctrl+Enter 전송</td></tr><tr><td>6</td><td>보내기 / ■ 중지</td><td>응답 중에는 중지 버튼으로 바뀜</td></tr><tr><td>7</td><td>프로바이더 / 모델</td><td>지금 사용 중인 모델 (상단바에서 변경)</td></tr></tbody></table>
+<ol><li>상단바에서 프로바이더/모델 선택</li><li>입력란에 질문 → <strong>보내기</strong> 또는 <code>Ctrl+Enter</code></li><li>응답은 실시간으로 표시. <strong>■ 중지</strong> 로 끊을 수 있음</li><li>응답 아래 <strong>복사</strong> / <strong>답안에 삽입</strong></li></ol>
+<p>대화는 <strong>문제마다 따로 저장</strong>되며, 다시 열면 이어집니다. 🗑 로 비울 수 있습니다.</p>
+<ul><li>■ 중지를 누르면 그때까지 받은 내용이 &quot;(사용자가 중단함)&quot; 표시와 함께 남고 바로 다음 질문을 보낼 수 있습니다.</li><li>AI 서버가 5분 동안 아무 응답도 주지 않으면 자동으로 끊고 오류를 표시합니다. 오류 말풍선의 <strong>다시 시도</strong> 로 같은 질문을 다시 보낼 수 있습니다.</li><li>선택한 프로바이더에 키가 없으면 채팅 상단에 노란 안내와 <strong>설정에서 키 입력</strong> 버튼이 나타납니다.</li></ul>
+<h2 id="ai-가-보는-것-컨텍스트">AI 가 보는 것 (컨텍스트)</h2>
+<p>입력란 위 체크박스로 조절합니다. 체크박스의 초기값과 출력 토큰 등은 ⚙️ 설정 → 💬 채팅 옵션에서 바꿉니다.</p>
+<p><img src="../../images/settings-chat.png" alt="설정 &gt; 채팅 옵션" loading="lazy"></p>
+<table><thead><tr><th>옵션</th><th>포함되는 내용</th><th>기본</th></tr></thead><tbody><tr><td>지문 포함</td><td>문제 제목, 지문, 제출 형식, 글자 수 제한, 평가 기준</td><td>켬</td></tr><tr><td>참고자료 포함</td><td>텍스트 참고자료 전문 (최대 12만 자, 설정에서 변경)</td><td>켬</td></tr><tr><td>내 답안 포함</td><td>현재 에디터 내용</td><td>끔 (피드백/다듬기 버튼은 자동 포함)</td></tr></tbody></table>
+<blockquote><p>참고자료가 크면 비용과 응답 시간이 늘어납니다. 자료 요약을 한 번 받아 둔 뒤, 이후 질문은 &quot;참고자료 포함&quot; 을 끄는 것도 방법입니다.</p></blockquote>
+<h2 id="빠른-작업-버튼">빠른 작업 버튼</h2>
+<table><thead><tr><th>버튼</th><th>하는 일</th></tr></thead><tbody><tr><td>📝 개요 제안</td><td>답안 목차와 각 항목에 담을 내용 제안</td></tr><tr><td>📊 자료 요약</td><td>참고자료 핵심을 항목별·표로 요약</td></tr><tr><td>✅ 답안 피드백</td><td>제출 형식·평가 기준 기준으로 잘한 점/부족한 점/개선안, 글자 수 준수 여부</td></tr><tr><td>✍️ 문장 다듬기</td><td>의미 유지하며 문장 교정, 수정 내역 표</td></tr><tr><td>❓ 질문 거리</td><td>스스로 점검할 질문 5개</td></tr></tbody></table>
+<p>입력란에 글을 쓴 채로 버튼을 누르면 &quot;추가 요청&quot; 으로 함께 전달됩니다. (관리자) 버튼 이름과 지시문은 <code>server/lib/prompt.js</code> 의 <code>QUICK_ACTIONS</code> 한 곳에서 바꿉니다.</p>
+<h2 id="잘-쓰는-요령">잘 쓰는 요령</h2>
+<ul><li><strong>계산은 과정을 보여 달라고</strong> 하세요: &quot;유지보수 지속 시 연간 비용을 계산 과정과 함께&quot;</li><li><strong>표로 요청</strong>: &quot;분기별로 집계해서 표로&quot;</li><li><strong>역할을 주세요</strong>: &quot;경영진 입장에서 이 보고서의 약점을 지적해 줘&quot;</li><li>AI 의 수치는 참고자료와 <strong>대조</strong>하세요. 없는 수치를 만들어내기도 합니다</li><li>응답이 중간에 잘리면 &quot;계속&quot; 이라고 입력하거나, 설정 &gt; 채팅 옵션 &gt; 최대 출력 토큰을 늘리세요</li></ul>
+<h2 id="오류-메시지-읽기">오류 메시지 읽기</h2>
+<p><img src="../../images/chat-no-key.png" alt="키 없음 안내" loading="lazy"><br><em>선택한 프로바이더에 키가 없으면 채팅 상단에 안내가 뜹니다. 버튼으로 바로 설정을 엽니다.</em></p>
+<table><thead><tr><th>메시지</th><th>조치</th></tr></thead><tbody><tr><td>API 키가 설정되지 않았습니다</td><td>설정 &gt; API 키 입력</td></tr><tr><td>상단바에서 모델을 지정하세요 / 모델이 지정되지 않았습니다</td><td>OpenCode·사용자 정의는 기본 모델이 없음. 상단바 ⟳ 로 목록을 불러와 선택</td></tr><tr><td>401 / 키가 잘못되었습니다</td><td>키 재확인, 만료 여부</td></tr><tr><td>404 / 모델을 찾을 수 없습니다</td><td>상단바 모델 ID 확인, ⟳ 로 목록 조회</td></tr><tr><td>429 / 한도 초과</td><td>잠시 후 재시도, 결제·크레딧 확인</td></tr><tr><td>서버에 연결할 수 없습니다</td><td>서버 창이 꺼졌는지, Base URL(로컬 서버) 확인</td></tr><tr><td>모델이 응답을 거부했습니다</td><td>질문을 바꿔 보세요 (Claude 는 설정에서 자동 대체 모델 사용 가능)</td></tr><tr><td>OpenCode: 404 / 엔드포인트를 찾을 수 없습니다</td><td>해당 모델이 chat/completions 를 지원하지 않는 경우. ⟳ 목록에서 다른 모델 선택</td></tr></tbody></table></article>
+    <div class="docs-foot">
+      <span>← <a href="../guide/04-답안-작성.html">4. 답안 작성 (가운데 에디터)</a></span>
+      <span><a href="../guide/06-AI로-문제집-만들기.html">6. AI 로 문제집 만들기</a> →</span>
+    </div>
+  </main>
+</div>
+</body>
+</html>

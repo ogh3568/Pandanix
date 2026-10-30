@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>8. Doctor (환경 점검) · Pandanix 가이드</title>
+<link rel="stylesheet" href="../assets/guide.css" />
+</head>
+<body>
+<div class="docs">
+  <nav class="docs-nav">
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <h3>시작하기</h3><a href="../quick-start.html" class="">퀵 스타트 (5분)</a><h3>사용 가이드</h3><a href="../guide/01-설치와-실행.html" class="">1. 설치와 실행</a><a href="../guide/02-API-키-설정.html" class="">2. API 키 설정</a><a href="../guide/03-문제집과-문제.html" class="">3. 문제집과 문제</a><a href="../guide/04-답안-작성.html" class="">4. 답안 작성 (가운데 에디터)</a><a href="../guide/05-AI-채팅.html" class="">5. AI 채팅 (오른쪽 패널)</a><a href="../guide/06-AI로-문제집-만들기.html" class="">6. AI 로 문제집 만들기</a><a href="../guide/07-파일-탐색기.html" class="">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a><a href="../guide/08-Doctor.html" class="active">8. Doctor (환경 점검)</a><a href="../guide/09-FAQ-문제해결.html" class="">9. FAQ · 문제 해결</a><details ><summary>개발/유지보수</summary><a href="../dev/api.html" class="">API 레퍼런스</a><a href="../dev/architecture.html" class="">아키텍처 (개발자/AI 용)</a><a href="../dev/changelog.html" class="">변경 이력</a><a href="../dev/data-model.html" class="">데이터 모델</a><a href="../dev/decisions.html" class="">설계 결정 기록 (ADR)</a><a href="../dev/frontend.html" class="">프런트엔드 메모</a><a href="../dev/maintenance.html" class="">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a><a href="../dev/providers.html" class="">AI 프로바이더</a></details>
+  </nav>
+  <main class="docs-main">
+    <article class="prose"><h1 id="8-doctor-환경-점검">8. Doctor (환경 점검)</h1>
+<p>실행이 안 되거나 AI 가 응답하지 않을 때 <strong>원인을 자동으로 찾아 주는</strong> 기능입니다.</p>
+<h2 id="실행-방법">실행 방법</h2>
+<table><thead><tr><th>방법</th><th>설명</th></tr></thead><tbody><tr><td>앱 안 <strong>🩺 Doctor</strong> 버튼</td><td>결과를 화면에 표시. <strong>실시간 API 테스트</strong> 로 실제 연결까지 확인</td></tr><tr><td><code>doctor.bat</code></td><td>서버를 띄우지 않고 터미널에서 점검</td></tr><tr><td><code>doctor.bat --live</code> / <code>npm run doctor:live</code></td><td>API 연결 테스트 포함</td></tr><tr><td><code>node server/doctor-cli.js --json</code></td><td>JSON 출력 (스크립트용)</td></tr></tbody></table>
+<p><img src="../../images/doctor.png" alt="Doctor 화면" loading="lazy"><br><em>① 요약 ② 점검 항목(실패 → 주의 → 정상 순, 조치 안내와 설정 열기 버튼) ③ 결과 복사 · 설정 열기 · 다시 검사 · 실시간 API 테스트</em></p>
+<h2 id="점검-항목">점검 항목</h2>
+<table><thead><tr><th>항목</th><th>실패 시 조치</th></tr></thead><tbody><tr><td>Node.js 버전 ≥ 22</td><td>nodejs.org 에서 LTS 설치</td></tr><tr><td>운영체제</td><td>Windows 가 아니면 주의(동작은 함)</td></tr><tr><td>npm 의존성</td><td><code>npm install</code></td></tr><tr><td>데이터 폴더 쓰기</td><td>폴더 권한 확인 또는 <code>PANDANIX_DATA_DIR</code> 변경</td></tr><tr><td>settings.json / credentials.json</td><td>JSON 문법 오류면 파일 수정 또는 삭제 후 재시작(자동 재생성)</td></tr><tr><td>API 키 git 제외</td><td><code>.gitignore</code> 확인</td></tr><tr><td>API 키 (프로바이더별)</td><td>기본 프로바이더 키가 없으면 ❌, 나머지는 ⚠ (사용자 정의는 선택)</td></tr><tr><td>AI 사용 가능 여부</td><td>키가 하나도 없으면 ❌ → 최소 1개 입력</td></tr><tr><td>기본 프로바이더/모델</td><td>설정 &gt; 기본 모델</td></tr><tr><td>파일 접근 허용 폴더</td><td>없는 폴더는 설정에서 제거</td></tr><tr><td>포트</td><td>이미 사용 중이면 기존 서버 사용 또는 포트 변경</td></tr><tr><td>문제집 데이터</td><td>손상된 <code>workbook.json</code> 수정/삭제</td></tr><tr><td>연결 테스트 (live)</td><td>키·Base URL·프록시/방화벽 확인</td></tr></tbody></table>
+<h2 id="결과-공유">결과 공유</h2>
+<p><strong>결과 복사</strong> 버튼은 점검 결과를 텍스트로 복사합니다. 담당자나 AI 에게 붙여 넣으면 빠르게 진단할 수 있습니다.</p>
+<h2 id="종료-코드-cli">종료 코드 (CLI)</h2>
+<p>실패 항목이 하나라도 있으면 <code>1</code>, 아니면 <code>0</code>. 배치 스크립트에서 사전 점검용으로 쓸 수 있습니다. 키를 넣지 않은 개발 환경에서는 &quot;API 키 - 기본&quot; 실패 1건 때문에 <code>1</code> 로 끝나는 것이 정상입니다.</p></article>
+    <div class="docs-foot">
+      <span>← <a href="../guide/07-파일-탐색기.html">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a></span>
+      <span><a href="../guide/09-FAQ-문제해결.html">9. FAQ · 문제 해결</a> →</span>
+    </div>
+  </main>
+</div>
+</body>
+</html>

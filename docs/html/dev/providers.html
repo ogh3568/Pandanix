@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI 프로바이더 · Pandanix 가이드</title>
+<link rel="stylesheet" href="../assets/guide.css" />
+</head>
+<body>
+<div class="docs">
+  <nav class="docs-nav">
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <h3>시작하기</h3><a href="../quick-start.html" class="">퀵 스타트 (5분)</a><h3>사용 가이드</h3><a href="../guide/01-설치와-실행.html" class="">1. 설치와 실행</a><a href="../guide/02-API-키-설정.html" class="">2. API 키 설정</a><a href="../guide/03-문제집과-문제.html" class="">3. 문제집과 문제</a><a href="../guide/04-답안-작성.html" class="">4. 답안 작성 (가운데 에디터)</a><a href="../guide/05-AI-채팅.html" class="">5. AI 채팅 (오른쪽 패널)</a><a href="../guide/06-AI로-문제집-만들기.html" class="">6. AI 로 문제집 만들기</a><a href="../guide/07-파일-탐색기.html" class="">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a><a href="../guide/08-Doctor.html" class="">8. Doctor (환경 점검)</a><a href="../guide/09-FAQ-문제해결.html" class="">9. FAQ · 문제 해결</a><details open><summary>개발/유지보수</summary><a href="../dev/api.html" class="">API 레퍼런스</a><a href="../dev/architecture.html" class="">아키텍처 (개발자/AI 용)</a><a href="../dev/changelog.html" class="">변경 이력</a><a href="../dev/data-model.html" class="">데이터 모델</a><a href="../dev/decisions.html" class="">설계 결정 기록 (ADR)</a><a href="../dev/frontend.html" class="">프런트엔드 메모</a><a href="../dev/maintenance.html" class="">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a><a href="../dev/providers.html" class="active">AI 프로바이더</a></details>
+  </nav>
+  <main class="docs-main">
+    <article class="prose"><h1 id="ai-프로바이더">AI 프로바이더</h1>
+<h2 id="등록-serverconfigjs-providers">등록 (<code>server/config.js</code> → <code>PROVIDERS</code>)</h2>
+<pre><code>anthropic: { label, kind: &#39;anthropic&#39;, envKey: &#39;ANTHROPIC_API_KEY&#39;, defaultModel: &#39;claude-opus-5-5&#39;, keyUrl, fields: [&#39;apiKey&#39;] }
+openai:    { kind: &#39;openai&#39;, ... fields: [&#39;apiKey&#39;,&#39;baseUrl&#39;,&#39;organization&#39;] }
+gemini:    { kind: &#39;gemini&#39;, ... }
+opencode:  { kind: &#39;openai&#39;, defaultBaseUrl: &#39;https://opencode.ai/zen/v1&#39;, ... }   // OpenAI 호환
+custom:    { kind: &#39;openai&#39;, defaultBaseUrl: &#39;http://localhost:11434/v1&#39;, ... }    // Ollama 등, 키 선택</code></pre>
+<p><code>kind</code> 가 어댑터를 결정한다(<code>providers/index.js getProvider</code>). 같은 <code>kind</code> 를 공유하는 항목은 설정(키/BaseURL)만 다르다.</p>
+<h2 id="어댑터-규약-providersjs">어댑터 규약 (<code>providers/*.js</code>)</h2>
+<ul><li><code>streamChat()</code> 은 텍스트 델타를 <code>onDelta</code> 로 흘리고 최종 <code>{ text, stopReason, usage, model }</code> 반환. 오류는 <strong>한국어 메시지 + <code>status</code></strong> 로 정규화(<code>normalizeError</code>). 상태 코드별 문구(401/403/404/429/5xx)를 유지할 것.</li><li><code>abortSignal</code> 을 SDK 요청 옵션으로 전달해 사용자의 ■ 중지가 실제 요청 취소로 이어지게 한다.</li><li><code>listModels()</code> 는 설정 UI 의 &quot;목록&quot; 과 doctor <code>--live</code>, 연결 테스트에 쓰인다.</li></ul>
+<h3 id="anthropic-anthropicjs">Anthropic (<code>anthropic.js</code>)</h3>
+<ul><li>공식 <code>@anthropic-ai/sdk</code>, <code>client.messages.stream()</code> + <code>finalMessage()</code>. timeout 20분, maxRetries 2.</li><li><strong>thinking 파라미터를 보내지 않는다.</strong> Claude 5 세대는 adaptive 가 기본이고 <code>budget_tokens</code> 는 400 을 낸다.</li><li><strong>샘플링 파라미터(temperature 등)도 보내지 않는다.</strong></li><li>모델 ID 는 날짜 접미사 없이(<code>claude-opus-5-5</code>). 사용 가능한 ID 는 <code>listModels()</code> 로 확인.</li><li>서버측 대체(fallbacks): <code>settings.anthropic.fallbacks</code>(기본 true) 이고 모델이 <code>claude-opus-5*</code>, <code>claude-sonnet-5-5</code>, <code>claude-fable-5*</code> 중 하나면 <code>client.beta.messages.stream({ betas: [&#39;server-side-fallback-2026-07-01&#39;], fallbacks: &#39;default&#39; })</code>. 400 으로 거부되면 일반 호출로 1회 재시도.</li><li><code>stop_reason === &#39;refusal&#39;</code> 은 <code>routes/chat.js</code> 에서 사용자 안내 문구로 바꾼다. <code>max_tokens</code> 는 &quot;계속&quot; 안내.</li><li>최신 API 규약 변경은 Anthropic 공식 문서(https://platform.claude.com/docs)를 확인한다.</li></ul>
+<h3 id="openai-호환-openaijs">OpenAI 호환 (<code>openai.js</code>)</h3>
+<ul><li><code>chat.completions.create({ stream:true, max_completion_tokens, stream_options:{include_usage:true} })</code>.</li><li>일부 호환 서버가 <code>max_completion_tokens</code>/<code>stream_options</code> 를 거부하면 <code>max_tokens</code> 만으로 재시도.</li><li><code>baseUrl</code> 이 있으면 <code>baseURL</code> 로. OpenCode Zen 은 모델에 따라 <code>/responses</code> 만 지원하기도 하므로 chat/completions 에서 404 가 나는 모델은 다른 모델을 고르게 안내한다(guide/05 오류 표, guide/02).</li><li>finish_reason 매핑: <code>stop</code>→<code>end_turn</code>, <code>length</code>→<code>max_tokens</code>, <code>content_filter</code>→<code>refusal</code>. 연결 오류는 <code>OpenAI.APIConnectionError</code> 로 판별해 한국어 안내.</li></ul>
+<h3 id="gemini-geminijs">Gemini (<code>gemini.js</code>)</h3>
+<ul><li><code>@google/genai</code> <code>ai.models.generateContentStream({ model, contents, config:{ systemInstruction, maxOutputTokens, abortSignal } })</code>.</li><li>역할 매핑: assistant → <code>model</code>. 모델 목록은 <code>supportedActions</code> 에 <code>generateContent</code> 가 있는 것만.</li><li>finishReason 매핑: <code>MAX_TOKENS</code>→<code>max_tokens</code>, <code>SAFETY</code>/<code>PROHIBITED_CONTENT</code>/<code>BLOCKLIST</code>/<code>SPII</code>/<code>RECITATION</code> 또는 <code>promptFeedback.blockReason</code>→<code>refusal</code>.</li></ul>
+<h2 id="새-프로바이더-추가-절차">새 프로바이더 추가 절차</h2>
+<ol><li><code>config.js PROVIDERS</code> 에 항목 추가. 필수 키: <code>label, kind, envKey, defaultModel, keyUrl, fields</code>. 선택: <code>defaultBaseUrl, note, keyOptional</code>(키 없이 동작하는 로컬 서버면 반드시 true). OpenAI 호환이면 <code>kind: &#39;openai&#39;</code> + <code>defaultBaseUrl</code> 만으로 <strong>동작한다</strong> — 설정 화면·상단바·doctor·기본 모델 목록은 <code>PROVIDERS</code> 를 순회한다.</li><li>새 SDK 가 필요하면 <code>providers/&lt;name&gt;.js</code> 에 어댑터 작성, <code>providers/index.js</code> 의 switch 에 <code>kind</code> 추가, <code>package.json</code> 의존성 추가(ADR-2 기록).</li><li>마무리 체크리스트: <code>DEFAULT_CREDENTIALS</code>(config.js) 와 <code>data/config/credentials.example.json</code> 에 빈 항목, <code>docs/guide/02-API-키-설정.md</code> 의 프로바이더 표와 환경변수 표, FAQ 의 프록시 허용 호스트 목록, README 의 프로바이더 나열, <code>changelog.md</code>.</li><li><code>npm test</code> (모의 서버는 OpenAI 호환만 흉내 내므로 다른 kind 는 <code>ping()</code> 을 수동 확인).</li></ol>
+<h2 id="프롬프트-serverlibpromptjs">프롬프트 (<code>server/lib/prompt.js</code>)</h2>
+<ul><li><code>APP_PERSONA</code>: 모든 채팅의 시스템 프롬프트 머리말.</li><li><code>buildSystemPrompt()</code>: 문제 컨텍스트 조립. 참고자료는 <code>settings.chat.maxReferenceChars</code> 로 자른다.</li><li><code>QUICK_ACTIONS</code>: 빠른 작업 정의 <code>{ label, prompt, needsAnswer }</code> 한 곳. 프런트는 <code>/api/chat-quick-actions</code> 로 받아 자동 렌더.</li><li><code>buildWorkbookGenerationPrompt()</code> + <code>extractJson()</code>: 생성 스키마. 스키마 변경 시 <code>routes/generate.js saveGenerated</code> 동기화.</li></ul></article>
+    <div class="docs-foot">
+      <span>← <a href="../dev/maintenance.html">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a></span>
+      <span></span>
+    </div>
+  </main>
+</div>
+</body>
+</html>

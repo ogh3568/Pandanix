@@ -44,5 +44,5 @@ custom:    { kind: 'openai', defaultBaseUrl: 'http://localhost:11434/v1', ... } 
 ## 프롬프트 (`server/lib/prompt.js`)
 - `APP_PERSONA`: 모든 채팅의 시스템 프롬프트 머리말.
 - `buildSystemPrompt()`: 문제 컨텍스트 조립. 참고자료는 `settings.chat.maxReferenceChars` 로 자른다.
-- `QUICK_ACTIONS`: 빠른 작업 키 → 사용자 메시지. 키를 추가하면 `public/js/ui/chat.js` 의 `QUICK_LABELS` 에 라벨도 추가.
+- `QUICK_ACTIONS`: 빠른 작업 정의 `{ label, prompt, needsAnswer }` 한 곳. 프런트는 `/api/chat-quick-actions` 로 받아 자동 렌더.
 - `buildWorkbookGenerationPrompt()` + `extractJson()`: 생성 스키마. 스키마 변경 시 `routes/generate.js saveGenerated` 동기화.

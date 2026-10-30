@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>설계 결정 기록 (ADR) · Pandanix 가이드</title>
+<link rel="stylesheet" href="../assets/guide.css" />
+</head>
+<body>
+<div class="docs">
+  <nav class="docs-nav">
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <h3>시작하기</h3><a href="../quick-start.html" class="">퀵 스타트 (5분)</a><h3>사용 가이드</h3><a href="../guide/01-설치와-실행.html" class="">1. 설치와 실행</a><a href="../guide/02-API-키-설정.html" class="">2. API 키 설정</a><a href="../guide/03-문제집과-문제.html" class="">3. 문제집과 문제</a><a href="../guide/04-답안-작성.html" class="">4. 답안 작성 (가운데 에디터)</a><a href="../guide/05-AI-채팅.html" class="">5. AI 채팅 (오른쪽 패널)</a><a href="../guide/06-AI로-문제집-만들기.html" class="">6. AI 로 문제집 만들기</a><a href="../guide/07-파일-탐색기.html" class="">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a><a href="../guide/08-Doctor.html" class="">8. Doctor (환경 점검)</a><a href="../guide/09-FAQ-문제해결.html" class="">9. FAQ · 문제 해결</a><details open><summary>개발/유지보수</summary><a href="../dev/api.html" class="">API 레퍼런스</a><a href="../dev/architecture.html" class="">아키텍처 (개발자/AI 용)</a><a href="../dev/changelog.html" class="">변경 이력</a><a href="../dev/data-model.html" class="">데이터 모델</a><a href="../dev/decisions.html" class="active">설계 결정 기록 (ADR)</a><a href="../dev/frontend.html" class="">프런트엔드 메모</a><a href="../dev/maintenance.html" class="">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a><a href="../dev/providers.html" class="">AI 프로바이더</a></details>
+  </nav>
+  <main class="docs-main">
+    <article class="prose"><h1 id="설계-결정-기록-adr">설계 결정 기록 (ADR)</h1>
+<p>형식: 배경 → 결정 → 결과. 바꾸고 싶으면 새 항목을 추가하고 이전 항목에 &quot;대체됨&quot; 표시.</p>
+<h2 id="adr-1-로컬-단일-사용자-인증-없음">ADR-1 로컬 단일 사용자, 인증 없음</h2>
+<ul><li>배경: 개인 PC(Windows)에서 혼자 쓰는 연습 도구. 파일 시스템 접근이 핵심 요구.</li><li>결정: 서버를 <code>127.0.0.1</code> 에 바인딩하고 인증을 두지 않는다. 다중 사용자는 범위 밖.</li><li>결과: 구현 단순. 공유 망 노출 시 위험 → FAQ 에 경고, <code>HOST</code> 변경은 사용자 책임.</li></ul>
+<h2 id="adr-2-의존성-최소화-프런트-라이브러리-0">ADR-2 의존성 최소화, 프런트 라이브러리 0</h2>
+<ul><li>배경: 이후 유지보수는 &quot;자체 AI&quot; 가 맡는다. 빌드 파이프라인·프레임워크 버전 관리는 부담.</li><li>결정: 서버 express + 공식 AI SDK 3종만. 프런트는 순수 ES 모듈, 마크다운 렌더러·에디터 자체 구현.</li><li>결과: 오프라인 동작, 읽기 쉬운 코드. 대가: 에디터 기능은 소박함(execCommand). 새 패키지는 꼭 필요할 때만, 이 문서에 기록.</li></ul>
+<h2 id="adr-3-파일-기반-저장소">ADR-3 파일 기반 저장소</h2>
+<ul><li>배경: 백업·이동·수동 편집이 쉬워야 하고 설치가 단순해야 한다.</li><li>결정: <code>data/</code> 아래 JSON + 원본 파일. 문제집 폴더 자체가 교환 형식.</li><li>결과: DB 없음. 동시 쓰기 보호 없음(단일 사용자 전제). 쓰기는 임시 파일 후 rename 으로 원자성 확보.</li></ul>
+<h2 id="adr-4-공식-sdk-사용-raw-fetch-대신">ADR-4 공식 SDK 사용 (raw fetch 대신)</h2>
+<ul><li>배경: 각 API 의 스트리밍·재시도·오류 형식이 다르고 자주 바뀐다.</li><li>결정: Anthropic/OpenAI/Google 공식 SDK 를 쓰고 얇은 어댑터로 정규화. OpenAI 호환 서버(OpenCode Zen, Ollama)는 OpenAI SDK + baseURL.</li><li>결과: 유지보수 시 SDK 업데이트로 API 변화를 흡수. 어댑터 인터페이스는 <code>architecture.md</code>.</li></ul>
+<h2 id="adr-5-sse-over-post">ADR-5 SSE over POST</h2>
+<ul><li>배경: 채팅/생성은 스트리밍이 필요하고 요청 본문이 크다(답안·컨텍스트).</li><li>결정: <code>fetch</code> POST + <code>text/event-stream</code> 응답, 클라이언트는 ReadableStream 파싱. WebSocket 은 불필요.</li><li>결과: 프록시 친화적, 구현 단순. 클라이언트 중단은 <code>res.on(&#39;close&#39;)</code> 로 감지(<code>req</code> close 는 본문 수신 후 즉시 발생하므로 쓰지 않음).</li></ul>
+<h2 id="adr-6-claude-호출-규약">ADR-6 Claude 호출 규약</h2>
+<ul><li>결정:<ul><li>thinking 파라미터를 보내지 않는다(adaptive 기본).</li><li>샘플링 파라미터를 보내지 않는다.</li><li>Claude 5 세대에는 <code>fallbacks: &#39;default&#39;</code>(베타 헤더)를 기본 적용하고, 400 이면 일반 호출로 재시도한다.</li><li>모델 ID 에 날짜 접미사를 붙이지 않는다.</li></ul></li><li>결과: 최신 모델에서 400 을 피하고 거부 응답을 줄인다. 규약은 <code>providers.md</code> 에 상세.</li></ul>
+<h2 id="adr-9-죽지-않는-서버-우선">ADR-9 &quot;죽지 않는 서버&quot; 우선</h2>
+<ul><li>배경: 사용자는 검은 서버 창이 꺼지면 앱이 멈춘 것으로 느낀다. 긴 AI 응답과 절전 복귀가 흔하다.</li><li>결정: 요청 타임아웃 해제 + SSE 하트비트, 프로바이더 무응답 감시(5분), 처리되지 않은 예외는 로그 후 계속 실행, <code>start.bat</code> 자동 재시작, 클라이언트는 오프라인 시 localStorage 백업.</li><li>결과: 타임아웃이나 일시적 오류로 화면이 영원히 &quot;응답 중&quot; 이거나 답안이 사라지는 일을 막는다. 대가: 예외 후 상태가 완전하다고 보장하지 못하므로 로그(<code>data/logs</code>)를 남긴다.</li></ul>
+<h2 id="adr-7-참고자료는-텍스트만-프롬프트에-포함">ADR-7 참고자료는 텍스트만 프롬프트에 포함</h2>
+<ul><li>배경: PDF/Office 추출은 의존성과 품질 문제가 크다.</li><li>결정: 1차 버전은 텍스트 확장자만 본문 전달, 나머지는 파일명·설명만. UI 와 문서에 명시.</li><li>결과: 사용자는 md/csv 로 변환해 올린다. 추출기 추가는 백로그(<code>maintenance.md</code>).</li></ul>
+<h2 id="adr-8-한국어-우선">ADR-8 한국어 우선</h2>
+<ul><li>결정: UI, 오류 메시지, 문서, 코드 주석을 한국어로. 식별자는 영어.</li><li>결과: 대상 사용자(국내 업무 교육)에 맞춤. 다국어는 백로그.</li></ul></article>
+    <div class="docs-foot">
+      <span>← <a href="../dev/data-model.html">데이터 모델</a></span>
+      <span><a href="../dev/frontend.html">프런트엔드 메모</a> →</span>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>1. 설치와 실행 · Pandanix 가이드</title>
+<link rel="stylesheet" href="../assets/guide.css" />
+</head>
+<body>
+<div class="docs">
+  <nav class="docs-nav">
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <h3>시작하기</h3><a href="../quick-start.html" class="">퀵 스타트 (5분)</a><h3>사용 가이드</h3><a href="../guide/01-설치와-실행.html" class="active">1. 설치와 실행</a><a href="../guide/02-API-키-설정.html" class="">2. API 키 설정</a><a href="../guide/03-문제집과-문제.html" class="">3. 문제집과 문제</a><a href="../guide/04-답안-작성.html" class="">4. 답안 작성 (가운데 에디터)</a><a href="../guide/05-AI-채팅.html" class="">5. AI 채팅 (오른쪽 패널)</a><a href="../guide/06-AI로-문제집-만들기.html" class="">6. AI 로 문제집 만들기</a><a href="../guide/07-파일-탐색기.html" class="">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a><a href="../guide/08-Doctor.html" class="">8. Doctor (환경 점검)</a><a href="../guide/09-FAQ-문제해결.html" class="">9. FAQ · 문제 해결</a><details ><summary>개발/유지보수</summary><a href="../dev/api.html" class="">API 레퍼런스</a><a href="../dev/architecture.html" class="">아키텍처 (개발자/AI 용)</a><a href="../dev/changelog.html" class="">변경 이력</a><a href="../dev/data-model.html" class="">데이터 모델</a><a href="../dev/decisions.html" class="">설계 결정 기록 (ADR)</a><a href="../dev/frontend.html" class="">프런트엔드 메모</a><a href="../dev/maintenance.html" class="">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a><a href="../dev/providers.html" class="">AI 프로바이더</a></details>
+  </nav>
+  <main class="docs-main">
+    <article class="prose"><h1 id="1-설치와-실행">1. 설치와 실행</h1>
+<h2 id="설치">설치</h2>
+<ol><li><a href="https://nodejs.org" target="_blank" rel="noopener">Node.js LTS</a> 설치 (<strong>22 이상</strong>, 내부 AI SDK 요구사항). 설치 후 새 명령 프롬프트에서 <code>node -v</code> 로 확인</li><li>프로젝트 폴더를 원하는 위치에 두기 (예: <code>C:\Pandanix</code>). 경로에 한글이 있어도 됩니다</li><li><code>start.bat</code> 실행 → 처음 1회 <code>npm install</code> 자동 수행</li></ol>
+<p>수동 설치:</p>
+<pre><code>cd C:\Pandanix
+npm install
+npm start</code></pre>
+<h2 id="실행-방법-비교">실행 방법 비교</h2>
+<table><thead><tr><th>방법</th><th>언제</th></tr></thead><tbody><tr><td><code>start.bat</code></td><td>평소. 브라우저 자동 열림</td></tr><tr><td><code>npm start</code></td><td>터미널에서 로그를 보며 실행</td></tr><tr><td><code>npm run dev</code></td><td>개발 중. 서버 파일이 바뀌면 자동 재시작</td></tr></tbody></table>
+<h2 id="가이드-보기">가이드 보기</h2>
+<p>상단바 <strong>📖 가이드</strong> 를 누르면 이 문서들을 앱 안에서 볼 수 있습니다. 오프라인용 HTML 은 <code>docs/html/index.html</code> 입니다.</p>
+<p><img src="../../images/docs-viewer.png" alt="문서 뷰어" loading="lazy"></p>
+<h2 id="종료">종료</h2>
+<p>서버 창에서 <code>Ctrl+C</code> 또는 창 닫기. 작성 중인 답안은 자동 저장되어 있습니다.</p>
+<h2 id="포트-바꾸기">포트 바꾸기</h2>
+<p>기본 포트는 <code>3210</code>. 바꾸려면 둘 중 하나:</p>
+<ul><li><code>data/config/settings.json</code> 의 <code>&quot;port&quot;</code> 수정</li><li>실행 시 환경변수: <code>set PORT=3300 &amp;&amp; npm start</code></li></ul>
+<h2 id="데이터-폴더-위치-바꾸기">데이터 폴더 위치 바꾸기</h2>
+<p>기본은 <code>&lt;프로젝트&gt;\data</code>. 다른 위치(예: OneDrive)에 두려면 환경변수 <code>PANDANIX_DATA_DIR</code> 지정:</p>
+<pre><code>set PANDANIX_DATA_DIR=D:\PandanixData
+start.bat</code></pre>
+<h2 id="업데이트">업데이트</h2>
+<p>새 버전 파일로 덮어쓴 뒤 <code>npm install</code> 한 번. <code>data/</code> 폴더는 건드리지 않으므로 문제집·답안·키가 유지됩니다. 새로 추가된 내장 문제집은 자동 설치되지 않으니 왼쪽 <strong>📚 내장 문제집</strong> 에서 설치하세요.</p>
+<h2 id="백업">백업</h2>
+<p><code>data/</code> 폴더를 통째로 복사하면 끝입니다. (키 파일 <code>credentials.json</code> 포함 여부에 주의)</p></article>
+    <div class="docs-foot">
+      <span>← <a href="../quick-start.html">퀵 스타트 (5분)</a></span>
+      <span><a href="../guide/02-API-키-설정.html">2. API 키 설정</a> →</span>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -95,11 +95,17 @@
 | doctor live 테스트 제한 | 20초/프로바이더 | `doctor.js` |
 | 가운데 패널 최소 폭 | 420px | `app.js CENTER_MIN`, `app.css` |
 
+### "가이드 화면 캡처/HTML 갱신"
+- UI 를 바꿨으면 `npm run docs:shots` (Playwright + Chromium 필요: `npm i -D playwright && npx playwright install chromium`). 임시 데이터 폴더와 모의 AI 서버로 앱을 띄워 `docs/images/*.png` 를 번호 박스·라벨과 함께 다시 만든다. 마크(`scripts/capture-guide-screenshots.mjs` 의 `marks`)의 번호와 `docs/guide/*.md` 의 범례 번호가 맞는지 확인.
+- 문서를 바꿨으면 `npm run docs:check`(링크·이미지·문법·오래된 표현 검사) → `npm run docs:build`(`docs/html/` 재생성). 둘 다 커밋한다.
+
 ## 문서 작성 규칙
 - `docs/**/*.md` 는 앱의 /docs 뷰어에 자동 등록된다: 첫 `# ` 줄이 제목, 폴더가 그룹(`guide`=사용 가이드, `dev`=개발/유지보수), 파일명 순 정렬.
 - 뷰어 렌더러가 지원하는 문법만 쓴다(`frontend.md` 참고): HTML 태그·체크박스·각주·2단계 중첩 금지. 표 셀 안의 `|` 는 `\|` 또는 "또는/" 로.
 - UI 문구를 바꾸면 `grep -r "<옛 문구>" docs` 로 가이드를 함께 고친다.
 - 사용자 가이드에 소스 경로를 적을 때는 "(관리자)" 표시를 붙인다.
+- 화면 캡처는 `![설명](../images/이름.png)` 다음 줄에 `*범례*` 를 이탤릭 한 줄로 쓴다(뷰어·HTML 에서 캡션으로 표시).
+- `npm run docs:check` 가 통과해야 한다.
 
 ## 테스트 가이드
 - 전체: `npm test` (`node --test`, `tests/*.test.mjs` 자동 탐색). 단일 파일: `node --test tests/api.test.mjs`.

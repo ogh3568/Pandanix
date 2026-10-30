@@ -24,6 +24,30 @@ const WORKBOOK_JSON = {
   ],
 };
 
+/** 문서 스크린샷용 그럴듯한 요약 응답 */
+const CANNED_SUMMARY = `참고자료 3건을 요약했습니다.
+
+### 1. 설비 현황
+- 2013년 도입한 200톤 프레스, 장부가 0원(상각 완료), 설계 수명 12~15년
+- 2026년부터 순정 부품 공급 종료 예정
+
+### 2. 2025년 고장 이력 (1~10월)
+| 구분 | 값 |
+|---|---|
+| 고장 건수 | 19건 |
+| 총 정지 시간 | 92시간 |
+| 수리비 합계 | 1,655만 원 |
+| 주요 원인 | 클러치 마모, 크랭크 베어링 |
+
+### 3. 신규 설비 견적
+| 항목 | A사 서보 SP-220 | B사 기계식 MP-200X |
+|---|---|---|
+| 가격 | 2억 6,000만 원 | 1억 9,500만 원 + 설치 1,500만 원 |
+| 납기 | 4개월 | 6개월(통관 지연 가능) |
+| 보증 | 3년 | 1년 |
+
+다음 단계로 "유지보수 지속 시 연간 비용을 계산해 줘" 라고 요청해 보세요.`;
+
 export function startMock(p = port) {
   const server = http.createServer((req, res) => {
     if (req.url.endsWith('/models')) {
@@ -49,7 +73,11 @@ export function startMock(p = port) {
           res.on('close', () => res.end()); // req 'close' 는 본문 수신 직후 발생하므로 res 쪽을 본다
           return;
         }
-        const text = /JSON 스키마/.test(sys) ? JSON.stringify(WORKBOOK_JSON) : `ECHO: ${last}\n\n| 항목 | 값 |\n|---|---|\n| 시스템길이 | ${sys.length} |\n| 참고자료포함 | ${/## 참고자료/.test(sys)} |\n| 답안포함 | ${/현재 답안 초안/.test(sys)} |`;
+        const text = /JSON 스키마/.test(sys)
+          ? JSON.stringify(WORKBOOK_JSON)
+          : /요약/.test(last)
+            ? CANNED_SUMMARY
+            : `ECHO: ${last}\n\n| 항목 | 값 |\n|---|---|\n| 시스템길이 | ${sys.length} |\n| 참고자료포함 | ${/## 참고자료/.test(sys)} |\n| 답안포함 | ${/현재 답안 초안/.test(sys)} |`;
         res.setHeader('content-type', 'text/event-stream');
         const chunks = text.match(/[\s\S]{1,40}/g) || [];
         let i = 0;

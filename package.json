@@ -10,7 +10,10 @@
     "doctor": "node server/doctor-cli.js",
     "doctor:live": "node server/doctor-cli.js --live",
     "test": "node --test",
-    "validate:library": "node server/validate-library.js"
+    "validate:library": "node server/validate-library.js",
+    "docs:build": "node scripts/build-docs-html.mjs",
+    "docs:check": "node scripts/check-docs.mjs",
+    "docs:shots": "node scripts/capture-guide-screenshots.mjs"
   },
   "engines": {
     "node": ">=22"

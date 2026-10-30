@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>변경 이력 · Pandanix 가이드</title>
+<link rel="stylesheet" href="../assets/guide.css" />
+</head>
+<body>
+<div class="docs">
+  <nav class="docs-nav">
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <h3>시작하기</h3><a href="../quick-start.html" class="">퀵 스타트 (5분)</a><h3>사용 가이드</h3><a href="../guide/01-설치와-실행.html" class="">1. 설치와 실행</a><a href="../guide/02-API-키-설정.html" class="">2. API 키 설정</a><a href="../guide/03-문제집과-문제.html" class="">3. 문제집과 문제</a><a href="../guide/04-답안-작성.html" class="">4. 답안 작성 (가운데 에디터)</a><a href="../guide/05-AI-채팅.html" class="">5. AI 채팅 (오른쪽 패널)</a><a href="../guide/06-AI로-문제집-만들기.html" class="">6. AI 로 문제집 만들기</a><a href="../guide/07-파일-탐색기.html" class="">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a><a href="../guide/08-Doctor.html" class="">8. Doctor (환경 점검)</a><a href="../guide/09-FAQ-문제해결.html" class="">9. FAQ · 문제 해결</a><details open><summary>개발/유지보수</summary><a href="../dev/api.html" class="">API 레퍼런스</a><a href="../dev/architecture.html" class="">아키텍처 (개발자/AI 용)</a><a href="../dev/changelog.html" class="active">변경 이력</a><a href="../dev/data-model.html" class="">데이터 모델</a><a href="../dev/decisions.html" class="">설계 결정 기록 (ADR)</a><a href="../dev/frontend.html" class="">프런트엔드 메모</a><a href="../dev/maintenance.html" class="">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a><a href="../dev/providers.html" class="">AI 프로바이더</a></details>
+  </nav>
+  <main class="docs-main">
+    <article class="prose"><h1 id="변경-이력">변경 이력</h1>
+<p>형식: <code>## 버전 (날짜)</code> 아래에 <code>- [영역] 내용</code>. 가장 최근이 위. 배포 전 작업은 <strong>미배포</strong> 섹션에 쌓았다가 버전을 올릴 때 이름을 바꾼다.</p>
+<h2 id="미배포">미배포</h2>
+<ul><li>[문서] 기능별 화면 캡처(번호 박스·라벨) 21장을 가이드에 삽입, 오프라인 HTML 가이드(<code>docs/html/</code>, <code>npm run docs:build</code>), 캡처 자동화(<code>npm run docs:shots</code>), 문서 점검기(<code>npm run docs:check</code>), 렌더러 이미지 지원</li><li>[UI] 에디터 내보내기 메뉴를 공통 메뉴(Esc·방향키)로 통일</li></ul>
+<h2 id="030-2026-10-30">0.3.0 (2026-10-30)</h2>
+<ul><li>[보안] 파일 API 에서 data/config 차단, 가져오기 경로 검증·롤백, 내보내기 폴더명 안전화, allowedRoots·설정 값 검증, Host 헤더 검사(DNS rebinding), HTML/SVG 첨부 다운로드 전용</li><li>[안정성] 요청 타임아웃 해제·SSE 하트비트, 프로바이더 무응답 감시(5분), SDK 타임아웃 20분, 처리되지 않은 예외에도 서버 유지 + 파일 로그(data/logs), start.bat 자동 재시작, IPv6 localhost 수신, 클라이언트 90초 유휴 감지·오프라인 배너·답안 localStorage 백업</li><li>[호환] Node 22 필수, Windows 예약 이름·끝 점 경로 처리, BOM JSON, EUC-KR CSV 판별, rename 재시도, 잡파일·손상 JSON 내성</li><li>[채팅] 중지 시 부분 응답 보존·재전송 가능(잠김 버그 수정), 오류·중단 메시지 이력 제외, 빠른 작업 단일 소스(label/prompt/needsAnswer), 키 없음 배너, 오류 말풍선 [다시 시도]/[설정 열기]</li><li>[UI] 모달 스택(Esc 최상위만)·포커스 트랩, 공통 메뉴(Esc·방향키), 키보드로 문제집·문제·탭·참고자료 탐색, 토스트 오른쪽 아래·중복 합침, 패널 접기 버튼, 가운데 최소 폭, 1366px 레이아웃, 모델 목록 팝업, 설정 저장 시 상단바 반영, 파일 선택기 최상위 상태 오류 수정, 저장본 시각 현지화, 표 조작 실행 취소 가능</li><li>[변환] 마크다운 렌더러(코드 스팬 보호·상대 링크·앵커·번호 시작), html2md 재작성, txt 내보내기 문자 보존, JSON 추출 강화</li><li>[문서] 리뷰 반영: 용어 통일(내장 문제집·파일 접근 허용 폴더), 레시피/용어집/튜닝 상수/테스트 가이드 추가, API 문서 보강, AGENTS.md 는 CLAUDE.md 포인터</li><li>[테스트] 30건 (보안 회귀, 견고성, 무응답 감시, EUC-KR, 검증)</li></ul>
+<h2 id="020-2026-10-30">0.2.0 (2026-10-30)</h2>
+<ul><li>[문제집] 내장 문제집 라이브러리 <code>server/seed/library/</code> 10종 31문제(참고자료 md/csv 포함), <code>/api/library</code> 목록·설치 API, 사이드바 &quot;📚 내장 문제집&quot; 다이얼로그, 첫 실행 시 전부 설치</li><li>[UI] 문제·참고자료 추가/수정/삭제 후 상단 제목·글자 수 제한·목록 즉시 갱신, 창 포커스 시 서버 재동기화(외부에서 파일을 바꿔도 반영)</li><li>[도구] <code>npm run validate:library</code> 라이브러리 무결성 검사, CSV 미리보기에서 <code>※</code> 각주 줄을 표 아래 주석으로 표시</li></ul>
+<h2 id="010-2026-10-30">0.1.0 (2026-10-30)</h2>
+<ul><li>[초기] Express 서버 + 순수 JS 프런트 3열 레이아웃(문제 / 답안 에디터 / AI 채팅)</li><li>[AI] Anthropic·OpenAI·Gemini 공식 SDK 어댑터, OpenCode Zen 및 OpenAI 호환 서버 지원, SSE 스트리밍, 문제별 대화 기록, 빠른 작업 5종</li><li>[문제집] 문제집/문제 CRUD, 참고자료 업로드·로컬 파일 복사·텍스트 작성·미리보기, 폴더 가져오기/내보내기, 샘플 문제집 시드</li><li>[AI 생성] 주제 기반 문제집 자동 생성(문제+참고자료+힌트+루브릭), 기존 문제집에 추가</li><li>[에디터] 서식·표·이미지·첨부·자동저장·버전 기록·글자 수 제한·md/html/txt 내보내기</li><li>[파일] 허용 루트 기반 파일 탐색/읽기/쓰기/생성/삭제 API 와 탐색기 UI</li><li>[Doctor] 환경 점검 12종 + 실시간 API 테스트 (UI/CLI/JSON)</li><li>[문서] 퀵 스타트, 기능별 가이드 9편, 개발 문서(아키텍처/데이터 모델/API/프로바이더/프런트/유지보수/ADR), 앱 내 문서 뷰어</li><li>[테스트] 단위 + 모의 서버 통합 테스트 15건</li></ul></article>
+    <div class="docs-foot">
+      <span>← <a href="../dev/architecture.html">아키텍처 (개발자/AI 용)</a></span>
+      <span><a href="../dev/data-model.html">데이터 모델</a> →</span>
+    </div>
+  </main>
+</div>
+</body>
+</html>

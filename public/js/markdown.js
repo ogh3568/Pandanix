@@ -13,6 +13,12 @@ function inline(text) {
     codes.push(`<code>${escapeHtml(c)}</code>`);
     return `\u0000${codes.length - 1}\u0000`;
   });
+  // 이미지도 escape 전에 떼어 둔다: ![대체텍스트](경로 "제목")
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, (_, alt, src, title) => {
+    if (/^javascript:/i.test(src)) return '';
+    codes.push(`<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${title ? ` title="${escapeHtml(title)}"` : ''} loading="lazy">`);
+    return `\u0000${codes.length - 1}\u0000`;
+  });
   s = escapeHtml(s);
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/(^|[^\w])__([^_]+)__(?!\w)/g, '$1<strong>$2</strong>');

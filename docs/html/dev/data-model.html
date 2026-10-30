@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>데이터 모델 · Pandanix 가이드</title>
+<link rel="stylesheet" href="../assets/guide.css" />
+</head>
+<body>
+<div class="docs">
+  <nav class="docs-nav">
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <h3>시작하기</h3><a href="../quick-start.html" class="">퀵 스타트 (5분)</a><h3>사용 가이드</h3><a href="../guide/01-설치와-실행.html" class="">1. 설치와 실행</a><a href="../guide/02-API-키-설정.html" class="">2. API 키 설정</a><a href="../guide/03-문제집과-문제.html" class="">3. 문제집과 문제</a><a href="../guide/04-답안-작성.html" class="">4. 답안 작성 (가운데 에디터)</a><a href="../guide/05-AI-채팅.html" class="">5. AI 채팅 (오른쪽 패널)</a><a href="../guide/06-AI로-문제집-만들기.html" class="">6. AI 로 문제집 만들기</a><a href="../guide/07-파일-탐색기.html" class="">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a><a href="../guide/08-Doctor.html" class="">8. Doctor (환경 점검)</a><a href="../guide/09-FAQ-문제해결.html" class="">9. FAQ · 문제 해결</a><details open><summary>개발/유지보수</summary><a href="../dev/api.html" class="">API 레퍼런스</a><a href="../dev/architecture.html" class="">아키텍처 (개발자/AI 용)</a><a href="../dev/changelog.html" class="">변경 이력</a><a href="../dev/data-model.html" class="active">데이터 모델</a><a href="../dev/decisions.html" class="">설계 결정 기록 (ADR)</a><a href="../dev/frontend.html" class="">프런트엔드 메모</a><a href="../dev/maintenance.html" class="">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a><a href="../dev/providers.html" class="">AI 프로바이더</a></details>
+  </nav>
+  <main class="docs-main">
+    <article class="prose"><h1 id="데이터-모델">데이터 모델</h1>
+<p>모든 데이터는 <code>DATA_DIR</code>(기본 <code>&lt;프로젝트&gt;/data</code>, 환경변수 <code>PANDANIX_DATA_DIR</code>) 아래 파일입니다.</p>
+<pre><code>data/
+  config/
+    settings.json              앱 설정 (DEFAULT_SETTINGS 와 deep-merge)
+    credentials.json           API 키 (git 제외)
+    credentials.example.json   템플릿
+  workbooks/&lt;wbId&gt;/
+    workbook.json
+    problems/&lt;pId&gt;/
+      problem.json
+      references/&lt;file&gt;       참고자료 원본 파일
+  answers/&lt;wbId&gt;/&lt;pId&gt;/
+    answer.json                { html, status, updatedAt }
+    history/&lt;timestamp&gt;.html   저장본 (2분 간격으로 1개, 최근 20개 - store.js HISTORY_KEEP/HISTORY_MIN_GAP_MS)
+    attachments/&lt;file&gt;         이미지/첨부
+    chat.json                  { messages:[...], updatedAt }
+  answers/general/general/chat.json   &quot;일반 채팅&quot; 기록
+  tmp/                         doctor 쓰기 테스트 등</code></pre>
+<p>ID 규칙: <code>wb_</code> / <code>p_</code> + 8자리 hex (<code>server/lib/ids.js</code>). 정규식 <code>^[A-Za-z0-9_-]{1,64}$</code> 를 통과해야 경로에 쓰인다. 내장 문제집 설치/가져오기 시에는 새 ID 가 발급된다.</p>
+<p>그 밖의 파일: <code>data/.seeded</code>(첫 실행 시드 완료 마커), <code>data/logs/pandanix.log</code>(서버 로그, 5MB 회전).</p>
+<h2 id="settingsjson">settings.json</h2>
+<pre><code>{
+  &quot;port&quot;: 3210,
+  &quot;defaultProvider&quot;: &quot;anthropic&quot;,
+  &quot;models&quot;: { &quot;anthropic&quot;: &quot;claude-opus-5-5&quot;, &quot;openai&quot;: &quot;gpt-5&quot;, &quot;gemini&quot;: &quot;gemini-2.5-pro&quot;, &quot;opencode&quot;: &quot;&quot;, &quot;custom&quot;: &quot;&quot; },
+  &quot;allowedRoots&quot;: [&quot;C:\\Users\\me\\Documents&quot;],   // DATA_DIR 는 자동 포함
+  &quot;chat&quot;: { &quot;maxOutputTokens&quot;: 32000, &quot;includeProblem&quot;: true, &quot;includeReferences&quot;: true, &quot;includeAnswer&quot;: false, &quot;maxReferenceChars&quot;: 120000 },  // include* 는 채팅 체크박스 초기값이자 API 직접 호출 시 기본값
+  &quot;anthropic&quot;: { &quot;fallbacks&quot;: true },             // Claude 5 세대 서버측 대체 모델
+  &quot;editor&quot;: { &quot;autosaveMs&quot;: 1500 }
+}</code></pre>
+<p>누락 키는 <code>DEFAULT_SETTINGS</code>(<code>server/config.js</code>)로 채워진다. 새 설정을 추가할 때는 기본값을 거기에 넣으면 기존 사용자 파일과 호환된다.</p>
+<h2 id="credentialsjson">credentials.json</h2>
+<pre><code>{
+  &quot;anthropic&quot;: { &quot;apiKey&quot;: &quot;&quot; },
+  &quot;openai&quot;:    { &quot;apiKey&quot;: &quot;&quot;, &quot;baseUrl&quot;: &quot;&quot;, &quot;organization&quot;: &quot;&quot; },
+  &quot;gemini&quot;:    { &quot;apiKey&quot;: &quot;&quot; },
+  &quot;opencode&quot;:  { &quot;apiKey&quot;: &quot;&quot;, &quot;baseUrl&quot;: &quot;https://opencode.ai/zen/v1&quot; },
+  &quot;custom&quot;:    { &quot;apiKey&quot;: &quot;&quot;, &quot;baseUrl&quot;: &quot;http://localhost:11434/v1&quot; }
+}</code></pre>
+<p><code>loadCredentials()</code> 는 환경변수(<code>PROVIDERS[name].envKey</code>, Gemini 는 <code>GOOGLE_API_KEY</code> 도)를 덮어쓰고 <code>_source: &#39;env&#39;|&#39;file&#39;</code> 을 표시한다.</p>
+<h2 id="workbookjson">workbook.json</h2>
+<pre><code>{
+  &quot;id&quot;: &quot;wb_8ac942b3&quot;,
+  &quot;title&quot;: &quot;AI 활용 기초: 업무 보고서와 의사결정&quot;,
+  &quot;description&quot;: &quot;…&quot;,
+  &quot;category&quot;: &quot;업무 일반&quot;,
+  &quot;difficulty&quot;: &quot;초급&quot;,          // 초급|중급|고급|&quot;&quot;
+  &quot;source&quot;: &quot;manual | ai | import | library&quot;,
+  &quot;libraryId&quot;: &quot;lib-basics&quot;,      // 내장 문제집에서 설치한 경우만. 라이브러리 화면의 &quot;설치됨&quot; 판정에 사용
+  &quot;createdAt&quot;: &quot;ISO&quot;, &quot;updatedAt&quot;: &quot;ISO&quot;,
+  &quot;problemOrder&quot;: [&quot;p_a2ab51a1&quot;, &quot;p_…&quot;]   // 표시 순서. 실제 문제는 problems/ 폴더
+}</code></pre>
+<p>API 응답(<code>summarizeWorkbook</code>)에는 <code>problems: [{id, title, tags}]</code> 가 덧붙는다.</p>
+<h2 id="problemjson">problem.json</h2>
+<pre><code>{
+  &quot;id&quot;: &quot;p_a2ab51a1&quot;,
+  &quot;title&quot;: &quot;설비 교체 검토 보고서 작성&quot;,
+  &quot;prompt&quot;: &quot;마크다운 지문&quot;,
+  &quot;submission&quot;: { &quot;format&quot;: &quot;제출 형식 설명(마크다운)&quot;, &quot;charLimit&quot;: 1200, &quot;deliverables&quot;: [&quot;보고서 본문&quot;, &quot;대안 비교표&quot;] },
+  &quot;references&quot;: [ { &quot;file&quot;: &quot;설비정보.md&quot;, &quot;name&quot;: &quot;표시 이름&quot;, &quot;description&quot;: &quot;한 줄 설명&quot; } ],  // 순서 = 표시 순서
+  &quot;hints&quot;: [&quot;…&quot;],
+  &quot;rubric&quot;: [&quot;평가 기준 …&quot;],      // 문자열 배열 (객체 {criterion} 도 허용)
+  &quot;tags&quot;: [&quot;보고서&quot;],
+  &quot;difficulty&quot;: &quot;초급&quot;,
+  &quot;estimatedMinutes&quot;: 40,
+  &quot;createdAt&quot;: &quot;ISO&quot;, &quot;updatedAt&quot;: &quot;ISO&quot;
+}</code></pre>
+<p>API 응답의 <code>references[]</code> 에는 파일 시스템에서 계산한 <code>size, ext, isText</code> 가 추가된다. <code>isText</code> 는 <code>TEXT_EXTS</code>(<code>store.js</code>)에 있는 확장자이며, 이 파일만 AI 프롬프트에 본문이 들어간다.</p>
+<h2 id="answerjson-chatjson">answer.json / chat.json</h2>
+<pre><code>// answer.json
+{ &quot;html&quot;: &quot;&lt;p&gt;…&lt;/p&gt;&quot;, &quot;status&quot;: &quot;draft|done&quot;, &quot;updatedAt&quot;: &quot;ISO&quot; }
+
+// chat.json
+{ &quot;messages&quot;: [
+    { &quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;…&quot;, &quot;quickAction&quot;: &quot;feedback|null&quot;, &quot;ts&quot;: &quot;ISO&quot; },
+    { &quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: &quot;…&quot;, &quot;provider&quot;: &quot;anthropic&quot;, &quot;model&quot;: &quot;claude-opus-5-5&quot;,
+      &quot;usage&quot;: { &quot;input&quot;: 1200, &quot;output&quot;: 300 }, &quot;stopReason&quot;: &quot;end_turn&quot;, &quot;ts&quot;: &quot;ISO&quot;,
+      &quot;error&quot;: true /*선택*/, &quot;aborted&quot;: true /*선택*/ }
+  ], &quot;updatedAt&quot;: &quot;ISO&quot; }</code></pre>
+<p>채팅 요청 시 서버는 <code>role</code> 이 user/assistant 이고 <code>error</code>/<code>aborted</code> 가 아닌, 내용이 있는 최근 30개만 모델에 보낸다. 중단된 응답은 받은 부분 + &quot;(사용자가 중단함)&quot; 으로 <code>aborted:true</code> 저장.</p>
+<h2 id="가져오기내보내기-형식">가져오기/내보내기 형식</h2>
+<p>문제집 폴더 그대로(<code>workbook.json</code> + <code>problems/&lt;id&gt;/problem.json</code> + <code>references/</code>). 가져올 때 ID 는 새로 발급되고 <code>references[]</code> 순서를 유지한다. 예시: <code>server/seed/library/lib-basics/</code>. 설치된 내장 문제집은 <code>workbook.json</code> 에 <code>libraryId</code> 가 기록되어 라이브러리 화면에서 &quot;설치됨&quot; 으로 표시된다.</p></article>
+    <div class="docs-foot">
+      <span>← <a href="../dev/changelog.html">변경 이력</a></span>
+      <span><a href="../dev/decisions.html">설계 결정 기록 (ADR)</a> →</span>
+    </div>
+  </main>
+</div>
+</body>
+</html>

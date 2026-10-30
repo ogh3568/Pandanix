@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>7. 파일 접근 (Windows 폴더 읽기·쓰기) · Pandanix 가이드</title>
+<link rel="stylesheet" href="../assets/guide.css" />
+</head>
+<body>
+<div class="docs">
+  <nav class="docs-nav">
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <h3>시작하기</h3><a href="../quick-start.html" class="">퀵 스타트 (5분)</a><h3>사용 가이드</h3><a href="../guide/01-설치와-실행.html" class="">1. 설치와 실행</a><a href="../guide/02-API-키-설정.html" class="">2. API 키 설정</a><a href="../guide/03-문제집과-문제.html" class="">3. 문제집과 문제</a><a href="../guide/04-답안-작성.html" class="">4. 답안 작성 (가운데 에디터)</a><a href="../guide/05-AI-채팅.html" class="">5. AI 채팅 (오른쪽 패널)</a><a href="../guide/06-AI로-문제집-만들기.html" class="">6. AI 로 문제집 만들기</a><a href="../guide/07-파일-탐색기.html" class="active">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a><a href="../guide/08-Doctor.html" class="">8. Doctor (환경 점검)</a><a href="../guide/09-FAQ-문제해결.html" class="">9. FAQ · 문제 해결</a><details ><summary>개발/유지보수</summary><a href="../dev/api.html" class="">API 레퍼런스</a><a href="../dev/architecture.html" class="">아키텍처 (개발자/AI 용)</a><a href="../dev/changelog.html" class="">변경 이력</a><a href="../dev/data-model.html" class="">데이터 모델</a><a href="../dev/decisions.html" class="">설계 결정 기록 (ADR)</a><a href="../dev/frontend.html" class="">프런트엔드 메모</a><a href="../dev/maintenance.html" class="">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a><a href="../dev/providers.html" class="">AI 프로바이더</a></details>
+  </nav>
+  <main class="docs-main">
+    <article class="prose"><h1 id="7-파일-접근-windows-폴더-읽기쓰기">7. 파일 접근 (Windows 폴더 읽기·쓰기)</h1>
+<p>Pandanix 는 <strong>허용한 폴더 안에서만</strong> 로컬 파일을 다룹니다. 데이터 폴더(<code>data/</code>)는 항상 허용됩니다.</p>
+<h2 id="허용-폴더-추가">허용 폴더 추가</h2>
+<p><img src="../../images/settings-roots.png" alt="설정 &gt; 파일 접근 허용 폴더" loading="lazy"><br><em>① 현재 허용된 폴더 ② 전체 경로 입력 ③ 추가</em></p>
+<ol><li><strong>⚙️ 설정 → 📁 파일 접근 허용 폴더</strong></li><li>전체 경로 입력 (탐색기 주소창에서 복사) 예: <code>C:\Users\홍길동\Documents\업무자료</code></li><li><strong>추가</strong> → 목록에 표시되면 완료 (존재하지 않는 폴더는 거부됨)</li></ol>
+<blockquote><p>하위 폴더는 자동으로 포함됩니다. <code>C:\</code> 전체를 추가하는 것은 권장하지 않습니다.</p></blockquote>
+<h2 id="어디에서-쓰이나">어디에서 쓰이나</h2>
+<table><thead><tr><th>기능</th><th>위치</th></tr></thead><tbody><tr><td>📁 <strong>파일</strong> (상단바)</td><td>파일 탐색기: 폴더 이동, 텍스트 미리보기·편집·저장, 새 파일/폴더 만들기, 삭제, Windows 탐색기로 열기</td></tr><tr><td>참고자료 → 📁 로컬 파일에서</td><td>로컬 파일을 문제의 참고자료로 <strong>복사</strong></td></tr><tr><td>에디터 → 내보내기 → 로컬 폴더에 저장</td><td>답안을 md/html 로 지정 폴더에 저장</td></tr><tr><td>문제집 ⋯ → 폴더로 내보내기 / 📥 가져오기</td><td>문제집 폴더 복사</td></tr></tbody></table>
+<h2 id="파일-탐색기-화면">파일 탐색기 화면</h2>
+<p><img src="../../images/file-explorer.png" alt="파일 탐색기" loading="lazy"><br><em>① 경로(💽 = 허용 폴더 목록, 회색 조각은 허용 범위 밖) ② 새 텍스트 파일 · 새 폴더 · Windows 탐색기로 열기 ③ 목록 ④ 미리보기·편집·삭제</em></p>
+<ul><li>상단 경로 조각(breadcrumb) 클릭으로 이동, 💽 로 허용 폴더 목록</li><li>텍스트 파일(md, txt, csv, json 등)은 클릭하면 미리보기 → <strong>✏️ 편집 → 저장</strong></li><li><strong>📄 새 텍스트 파일 / 📁 새 폴더</strong> 로 생성, <strong>삭제</strong> 는 확인 후 영구 삭제</li><li><strong>↗ 탐색기</strong> 는 현재 폴더를 Windows 탐색기로 엽니다</li></ul>
+<h2 id="제한">제한</h2>
+<ul><li>2MB 보다 큰 텍스트는 미리보기 불가(다운로드는 가능)</li><li>허용 폴더 밖 경로는 <code>403 허용되지 않은 경로</code> 로 거부됩니다. 이는 의도된 보호 동작입니다</li></ul></article>
+    <div class="docs-foot">
+      <span>← <a href="../guide/06-AI로-문제집-만들기.html">6. AI 로 문제집 만들기</a></span>
+      <span><a href="../guide/08-Doctor.html">8. Doctor (환경 점검)</a> →</span>
+    </div>
+  </main>
+</div>
+</body>
+</html>

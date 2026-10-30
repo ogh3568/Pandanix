@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때) · Pandanix 가이드</title>
+<link rel="stylesheet" href="../assets/guide.css" />
+</head>
+<body>
+<div class="docs">
+  <nav class="docs-nav">
+    <div class="brand"><span class="brand-logo">🐼</span><span class="brand-name">Pandanix</span><span class="brand-sub">가이드</span></div>
+    <h3>시작하기</h3><a href="../quick-start.html" class="">퀵 스타트 (5분)</a><h3>사용 가이드</h3><a href="../guide/01-설치와-실행.html" class="">1. 설치와 실행</a><a href="../guide/02-API-키-설정.html" class="">2. API 키 설정</a><a href="../guide/03-문제집과-문제.html" class="">3. 문제집과 문제</a><a href="../guide/04-답안-작성.html" class="">4. 답안 작성 (가운데 에디터)</a><a href="../guide/05-AI-채팅.html" class="">5. AI 채팅 (오른쪽 패널)</a><a href="../guide/06-AI로-문제집-만들기.html" class="">6. AI 로 문제집 만들기</a><a href="../guide/07-파일-탐색기.html" class="">7. 파일 접근 (Windows 폴더 읽기·쓰기)</a><a href="../guide/08-Doctor.html" class="">8. Doctor (환경 점검)</a><a href="../guide/09-FAQ-문제해결.html" class="">9. FAQ · 문제 해결</a><details open><summary>개발/유지보수</summary><a href="../dev/api.html" class="">API 레퍼런스</a><a href="../dev/architecture.html" class="">아키텍처 (개발자/AI 용)</a><a href="../dev/changelog.html" class="">변경 이력</a><a href="../dev/data-model.html" class="">데이터 모델</a><a href="../dev/decisions.html" class="">설계 결정 기록 (ADR)</a><a href="../dev/frontend.html" class="">프런트엔드 메모</a><a href="../dev/maintenance.html" class="active">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</a><a href="../dev/providers.html" class="">AI 프로바이더</a></details>
+  </nav>
+  <main class="docs-main">
+    <article class="prose"><h1 id="유지보수-가이드-ai-가-새-컨텍스트에서-이어받을-때">유지보수 가이드 (AI 가 새 컨텍스트에서 이어받을 때)</h1>
+<h2 id="작업-시작-체크리스트">작업 시작 체크리스트</h2>
+<ol><li><code>CLAUDE.md</code> → 이 문서 → 관련 <code>docs/dev/*.md</code> 읽기</li><li><code>npm install &amp;&amp; npm test</code> 로 현재 상태가 초록인지 확인</li><li>사용자 요청을 &quot;어느 계층&quot; 문제인지 분류: 프롬프트 / 프로바이더 / 저장소 / 라우트 / UI / 문서</li><li>수정 → <code>npm test</code> → 필요하면 <code>npm start</code> 로 화면 확인(헤드리스 브라우저로 스크린샷을 찍어 보는 것도 좋다)</li><li>문서 동기화 + <code>changelog.md</code> 한 줄</li></ol>
+<h2 id="흔한-요청별-레시피">흔한 요청별 레시피</h2>
+<h3 id="ai-말투지시를-바꿔-줘">&quot;AI 말투/지시를 바꿔 줘&quot;</h3>
+<p><code>server/lib/prompt.js</code> 의 <code>APP_PERSONA</code> 수정 후 서버 재시작. 테스트: 채팅 한 번.</p>
+<h3 id="빠른-작업-버튼-추가">&quot;빠른 작업 버튼 추가&quot;</h3>
+<ol><li><code>server/lib/prompt.js QUICK_ACTIONS</code> 에 <code>key: { label: &#39;🧾 버튼 이름&#39;, prompt: &#39;AI 에게 보낼 문구&#39;, needsAnswer: true|false }</code> 추가 (순서 = 버튼 순서). 끝.<ul><li><code>needsAnswer: true</code> 면 서버가 답안을 컨텍스트에 넣고, 클라이언트도 현재 답안 텍스트를 보낸다(둘 다 이 플래그를 읽음).</li></ul></li><li>문서: <code>docs/guide/05-AI-채팅.md</code> 버튼 표, <code>docs/dev/api.md</code> 의 quickAction 설명.</li><li>테스트: <code>tests/api.test.mjs</code> 의 빠른 작업 테스트를 복사해 새 key 로 한 건 추가. 모의 서버는 시스템 프롬프트에 <code>현재 답안 초안</code> 이 포함되면 <code>답안포함 | true</code> 를 돌려준다.</li></ol>
+<h3 id="프로바이더모델-추가">&quot;프로바이더/모델 추가&quot;</h3>
+<p><code>providers.md</code> 의 절차. OpenAI 호환이면 <code>config.js PROVIDERS</code> 한 항목으로 <strong>동작</strong>하고, 나머지(credentials.example.json, 가이드 02 의 두 표, FAQ 프록시 호스트 목록)는 마무리 체크리스트다. 키가 필요 없는 서버라면 <code>keyOptional: true</code> 를 꼭 넣는다.</p>
+<h3 id="기본-모델을-바꿔-줘">&quot;기본 모델을 바꿔 줘&quot;</h3>
+<p><code>config.js PROVIDERS[*].defaultModel</code> (새 설치 기본값). 기존 사용자는 설정 &gt; 기본 모델에서 저장하면 상단바의 브라우저 기억값(localStorage <code>pandanix:provider</code>, <code>pandanix:models</code>)도 초기화되어 바로 반영된다. 모델 ID 는 <code>/api/providers/:name/models</code> 로 검증. 예시 ID 가 적힌 문서: guide/02 표, data-model.md settings 예시, providers.md.</p>
+<h3 id="문제에-새-항목예-난이도별-배점-추가">&quot;문제에 새 항목(예: 난이도별 배점) 추가&quot;</h3>
+<ol><li><code>store.js PROBLEM_FIELDS</code> 에 키 추가, <code>createProblem</code> 기본값</li><li><code>workbookForms.js problemForm</code> 에 입력란, <code>sidebar.js renderTab</code> 에 표시</li><li>프롬프트에 포함시키려면 <code>prompt.js buildSystemPrompt</code></li><li>AI 생성에도 넣으려면 <code>buildWorkbookGenerationPrompt</code> 스키마 + <code>generate.js saveGenerated</code></li><li><code>data-model.md</code> 갱신</li></ol>
+<h3 id="참고자료-pdfxlsx-본문도-ai-가-읽게-해-줘">&quot;참고자료 PDF/xlsx 본문도 AI 가 읽게 해 줘&quot;</h3>
+<p>현재 <code>TEXT_EXTS</code> 만 본문 전달. 추가하려면 <code>store.js readReferencesAsText()</code> 에 확장자별 추출기를 붙인다(예: <code>pdf-parse</code>, <code>xlsx</code> 패키지). 의존성 추가는 <code>decisions.md ADR-2</code> 에 따라 기록. doctor 의 의존성 검사는 package.json 을 읽으므로 자동 반영.</p>
+<h3 id="에디터에-기능-추가-예-글자-색">&quot;에디터에 기능 추가 (예: 글자 색)&quot;</h3>
+<p><code>editor.js</code> 툴바에 버튼 + <code>document.execCommand(&#39;styleWithCSS&#39;, false, true)</code> 후 <code>exec(&#39;foreColor&#39;, color)</code> (안 켜면 <code>&lt;font&gt;</code> 태그가 생겨 <code>sanitize()</code> 에서 지워진다). <code>ALLOWED_ATTRS</code> 에 <code>SPAN: [&#39;style&#39;]</code> 을 추가해야 저장 후에도 유지된다. md/txt 내보내기(<code>html2md.js</code>)는 색을 버린다는 점을 가이드에 적는다.</p>
+<h3 id="ui-색레이아웃">&quot;UI 색/레이아웃&quot;</h3>
+<p><code>app.css :root</code> 변수. 패널 기본 폭 <code>--left-w/--right-w</code>.</p>
+<h3 id="다른-pc-에서-접속">&quot;다른 PC 에서 접속&quot;</h3>
+<p><code>HOST=0.0.0.0</code> 으로 실행(인증 없음 경고). 진짜 다중 사용자가 필요하면 설계 변경(사용자별 data 폴더, 인증) — <code>decisions.md ADR-1</code> 참고.</p>
+<h3 id="답안-저장-위치구조-변경">&quot;답안 저장 위치/구조 변경&quot;</h3>
+<p><code>store.js</code> 상단의 경로 도우미(<code>answerDir</code>, <code>attachmentsDir</code>, <code>chatFile</code>)가 기준이지만 숨은 결합이 있다:</p>
+<ul><li>답안 HTML 안에 첨부 URL <code>/api/answers/:wb/:p/attachments/&lt;file&gt;</code> 이 <strong>절대 경로로 저장</strong>된다 → 라우트 형태를 바꾸면 기존 답안의 이미지가 깨진다(마이그레이션 필요).</li><li><code>deleteWorkbook</code>, <code>answerStatusMap</code>, <code>seed.js</code> 는 <code>DIRS.answers</code> 를 직접 쓴다.</li><li><code>exportWorkbookToDir</code> 는 문제집 폴더를 통째로 복사하므로 답안을 문제집 폴더 안으로 옮기면 개인 답안·채팅이 함께 내보내진다.</li><li>경로 문구가 적힌 곳: <code>settings.js renderInfo</code>, README, guide 04, data-model.md, <code>.gitignore</code>.</li></ul>
+<p>데이터 폴더 전체를 옮기는 요구라면 코드 수정 없이 <code>PANDANIX_DATA_DIR</code> 로 해결한다.</p>
+<h3 id="새-api-엔드포인트-추가">&quot;새 API 엔드포인트 추가&quot;</h3>
+<p><code>server/routes/&lt;영역&gt;.js</code> 에 핸들러 → (새 파일이면) <code>app.js</code> 에 <code>app.use(&#39;/api&#39;, …)</code> → <code>public/js/api.js</code> 에 함수 → <code>docs/dev/api.md</code> 한 줄 → <code>tests/api.test.mjs</code> 한 건. 사용자 경로를 받으면 <code>resolveAllowed</code>, 파일명은 <code>safeName</code>.</p>
+<h3 id="설정-항목-추가">&quot;설정 항목 추가&quot;</h3>
+<p><code>config.js DEFAULT_SETTINGS</code> 에 기본값 → <code>validateSettingsPatch</code> 에 검증 → <code>settings.js</code> 의 해당 <code>renderXxx()</code> 입력란과 저장 payload → 사용처 → <code>data-model.md</code> settings 예시.</p>
+<h3 id="내장-문제집-추가수정">&quot;내장 문제집 추가/수정&quot;</h3>
+<p><code>server/seed/library/&lt;slug&gt;/</code> 폴더를 만들면 자동 등록된다(가져오기 폴더 형식, <code>workbook.json</code> 의 <code>id</code> = slug). <code>npm run validate:library</code> 로 검사. 규칙: 문제마다 참고자료 1개 이상, 지문 150자 이상, 루브릭 2개 이상, CSV 는 헤더와 열 수 일치(<code>※</code> 로 시작하는 각주 줄은 허용). <code>lib-basics</code> 는 테스트가 문제 3개·참고자료 순서를 고정하고 있으니 바꾸면 테스트도 수정. 기존 사용자는 자동 설치되지 않고 &quot;📚 내장 문제집&quot; 에서 설치한다.</p>
+<h2 id="용어집-ui-코드">용어집 (UI ↔ 코드)</h2>
+<table><thead><tr><th>UI 용어</th><th>코드 식별자</th><th>위치</th></tr></thead><tbody><tr><td>문제집</td><td>workbook, <code>wb</code></td><td><code>store.js</code>, <code>routes/workbooks.js</code></td></tr><tr><td>문제</td><td>problem, <code>p</code></td><td>〃</td></tr><tr><td>지문 / 제출 형식 / 평가 기준</td><td><code>prompt</code> / <code>submission.format</code>+<code>charLimit</code> / <code>rubric</code></td><td><code>problem.json</code></td></tr><tr><td>참고자료</td><td>reference</td><td><code>references/</code>, <code>TEXT_EXTS</code></td></tr><tr><td>답안 / 저장본 / 첨부</td><td>answer / history / attachments</td><td><code>routes/answers.js</code></td></tr><tr><td>빠른 작업</td><td>quickAction</td><td><code>prompt.js QUICK_ACTIONS</code></td></tr><tr><td>내장 문제집</td><td>library, slug, <code>libraryId</code></td><td><code>seed.js</code></td></tr><tr><td>파일 접근 허용 폴더(허용 루트)</td><td><code>allowedRoots</code>, <code>getAllowedRoots()</code></td><td><code>config.js</code>, <code>paths.js resolveAllowed</code></td></tr><tr><td>프로바이더</td><td>provider, <code>kind</code>(어댑터 종류)</td><td><code>config.js PROVIDERS</code>, <code>providers/</code></td></tr><tr><td>일반 채팅</td><td><code>general/general</code> 스코프</td><td><code>routes/chat.js</code></td></tr></tbody></table>
+<h2 id="튜닝-상수-표">튜닝 상수 표</h2>
+<table><thead><tr><th>조절값</th><th>기본</th><th>위치</th></tr></thead><tbody><tr><td>AI 페르소나·빠른 작업 문구·생성 프롬프트</td><td>—</td><td><code>server/lib/prompt.js</code></td></tr><tr><td>답안 컨텍스트 자르기</td><td>60,000자</td><td><code>prompt.js buildSystemPrompt</code></td></tr><tr><td>참고자료 컨텍스트 자르기</td><td>120,000자 (설정)</td><td><code>settings.chat.maxReferenceChars</code></td></tr><tr><td>최대 출력 토큰</td><td>32,000 (설정)</td><td><code>settings.chat.maxOutputTokens</code></td></tr><tr><td>대화 이력 개수</td><td>30 (요청 <code>maxHistory</code>, 최대 200)</td><td><code>routes/chat.js</code></td></tr><tr><td>메시지 길이 상한</td><td>200,000자</td><td><code>routes/chat.js</code></td></tr><tr><td>문제집 생성 출력 토큰 / 진행 보고 간격</td><td>32,000 / 200자</td><td><code>routes/generate.js</code></td></tr><tr><td>무응답 감시</td><td>5분 (<code>PANDANIX_STALL_TIMEOUT_MS</code>)</td><td><code>lib/watchdog.js</code></td></tr><tr><td>SDK 타임아웃 / 재시도</td><td>20분 / 2회</td><td><code>providers/*.js</code></td></tr><tr><td>SSE 하트비트 / 클라이언트 유휴 한계</td><td>15초 / 90초</td><td><code>lib/sse.js</code>, <code>public/js/api.js</code></td></tr><tr><td>저장본 개수 / 최소 간격</td><td>20 / 2분</td><td><code>store.js HISTORY_KEEP</code>, <code>HISTORY_MIN_GAP_MS</code></td></tr><tr><td>자동 저장 디바운스</td><td>1,500ms (설정)</td><td><code>settings.editor.autosaveMs</code></td></tr><tr><td>텍스트로 읽는 확장자</td><td>md, txt, csv, json, …</td><td><code>store.js TEXT_EXTS</code></td></tr><tr><td>파일 미리보기 상한 / 업로드 상한 / 본문 상한</td><td>2MB / 50MB / 80MB</td><td><code>routes/fs.js</code>, <code>public/js/api.js MAX_UPLOAD_BYTES</code>, <code>app.js</code></td></tr><tr><td>채팅 재렌더 간격 / 포커스 동기화 간격</td><td>120ms / 3초</td><td><code>chat.js</code>, <code>sidebar.js syncFromServer</code></td></tr><tr><td>doctor live 테스트 제한</td><td>20초/프로바이더</td><td><code>doctor.js</code></td></tr><tr><td>가운데 패널 최소 폭</td><td>420px</td><td><code>app.js CENTER_MIN</code>, <code>app.css</code></td></tr></tbody></table>
+<h3 id="가이드-화면-캡처html-갱신">&quot;가이드 화면 캡처/HTML 갱신&quot;</h3>
+<ul><li>UI 를 바꿨으면 <code>npm run docs:shots</code> (Playwright + Chromium 필요: <code>npm i -D playwright &amp;&amp; npx playwright install chromium</code>). 임시 데이터 폴더와 모의 AI 서버로 앱을 띄워 <code>docs/images/*.png</code> 를 번호 박스·라벨과 함께 다시 만든다. 마크(<code>scripts/capture-guide-screenshots.mjs</code> 의 <code>marks</code>)의 번호와 <code>docs/guide/*.md</code> 의 범례 번호가 맞는지 확인.</li><li>문서를 바꿨으면 <code>npm run docs:check</code>(링크·이미지·문법·오래된 표현 검사) → <code>npm run docs:build</code>(<code>docs/html/</code> 재생성). 둘 다 커밋한다.</li></ul>
+<h2 id="문서-작성-규칙">문서 작성 규칙</h2>
+<ul><li><code>docs/**/*.md</code> 는 앱의 /docs 뷰어에 자동 등록된다: 첫 <code># </code> 줄이 제목, 폴더가 그룹(<code>guide</code>=사용 가이드, <code>dev</code>=개발/유지보수), 파일명 순 정렬.</li><li>뷰어 렌더러가 지원하는 문법만 쓴다(<code>frontend.md</code> 참고): HTML 태그·체크박스·각주·2단계 중첩 금지. 표 셀 안의 <code>|</code> 는 <code>\|</code> 또는 &quot;또는/&quot; 로.</li><li>UI 문구를 바꾸면 <code>grep -r &quot;&lt;옛 문구&gt;&quot; docs</code> 로 가이드를 함께 고친다.</li><li>사용자 가이드에 소스 경로를 적을 때는 &quot;(관리자)&quot; 표시를 붙인다.</li><li>화면 캡처는 <code>![설명](../images/이름.png)</code> 다음 줄에 <code>*범례*</code> 를 이탤릭 한 줄로 쓴다(뷰어·HTML 에서 캡션으로 표시).</li><li><code>npm run docs:check</code> 가 통과해야 한다.</li></ul>
+<h2 id="테스트-가이드">테스트 가이드</h2>
+<ul><li>전체: <code>npm test</code> (<code>node --test</code>, <code>tests/*.test.mjs</code> 자동 탐색). 단일 파일: <code>node --test tests/api.test.mjs</code>.</li><li><code>tests/api.test.mjs</code> 는 임시 <code>PANDANIX_DATA_DIR</code> 에 앱을 띄우고 <code>tests/mock-openai-server.mjs</code> 를 <code>custom</code> 프로바이더로 연결한다. 모의 서버: 메시지를 <code>ECHO:</code> 로 되돌리고 시스템 프롬프트 길이/참고자료 포함/답안 포함 여부를 표로 알려준다. <code>JSON 스키마</code> 가 시스템 프롬프트에 있으면 가짜 문제집 JSON, 메시지에 <code>STALL</code> 이 있으면 무응답, 키가 <code>bad</code> 면 401.</li><li>실제 키가 필요한 검증은 <code>npm run doctor:live</code> 와 설정 화면의 연결 테스트로 수동 수행.</li></ul>
+<h2 id="알려진-기술-부채">알려진 기술 부채</h2>
+<ul><li>에디터는 <code>execCommand</code> 기반(표준에서 제외된 API). 대안 도입 시 ADR-2(의존성 최소화)와 저울질.</li><li>답안 HTML 에 첨부 절대 URL 이 저장됨(위 &quot;저장 위치 변경&quot; 참고).</li><li>PDF/Office 참고자료 본문 미추출(ADR-7).</li><li>다중 사용자/인증 없음(ADR-1).</li></ul>
+<h2 id="버그-추적-순서">버그 추적 순서</h2>
+<ol><li>브라우저 콘솔(F12) 오류 → 프런트 모듈 확인</li><li>서버 콘솔 <code>[pandanix] 오류:</code> 로그 → 라우트/스토어</li><li><code>npm run doctor:live</code> 로 환경 문제 배제</li><li>재현 테스트를 <code>tests/</code> 에 추가한 뒤 수정 (모의 서버 <code>tests/mock-openai-server.mjs</code> 로 AI 응답을 흉내낼 수 있다)</li></ol>
+<h2 id="릴리스배포">릴리스/배포</h2>
+<p>빌드 없음. 사용자는 폴더를 받아 <code>start.bat</code>. 버전은 <code>package.json version</code> 과 <code>changelog.md</code>.</p>
+<h2 id="백로그-아이디어">백로그 (아이디어)</h2>
+<ul><li>답안 첨부 URL 을 상대 참조로 바꾸는 마이그레이션</li><li>PDF/DOCX/XLSX 참고자료 본문 추출</li><li>참고자료를 Anthropic/OpenAI 의 파일 입력(문서 블록)으로 직접 전달</li><li>답안 DOCX 내보내기</li><li>다크 모드, 글꼴 크기 설정</li><li>문제집 공유용 zip 내보내기</li><li>채팅에서 로컬 파일을 첨부해 질문</li><li>사용량(토큰/비용) 통계 화면</li></ul></article>
+    <div class="docs-foot">
+      <span>← <a href="../dev/frontend.html">프런트엔드 메모</a></span>
+      <span><a href="../dev/providers.html">AI 프로바이더</a> →</span>
+    </div>
+  </main>
+</div>
+</body>
+</html>
