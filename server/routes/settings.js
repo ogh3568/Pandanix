@@ -10,7 +10,7 @@ export const settingsRouter = Router();
 settingsRouter.get('/settings', (req, res) => {
   res.json({
     settings: loadSettings(),
-    providers: Object.fromEntries(Object.entries(PROVIDERS).map(([k, v]) => [k, { label: v.label, kind: v.kind, keyUrl: v.keyUrl, note: v.note || '', defaultModel: v.defaultModel }])),
+    providers: Object.fromEntries(Object.entries(PROVIDERS).map(([k, v]) => [k, { label: v.label, kind: v.kind, keyUrl: v.keyUrl, note: v.note || '', defaultModel: v.defaultModel, keyOptional: Boolean(v.keyOptional) }])),
     credentials: maskedCredentials(),
     dataDir: DIRS.data,
     allowedRoots: getAllowedRoots(),

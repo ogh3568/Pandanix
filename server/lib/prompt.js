@@ -40,13 +40,17 @@ export function buildSystemPrompt({ workbookId, problemId, context = {}, answerT
   return parts.join('\n\n');
 }
 
-/** 빠른 작업 버튼용 사용자 메시지 템플릿 */
+/**
+ * 빠른 작업 버튼 (단일 소스). 순서 = 버튼 순서.
+ *  label: 버튼 문구, prompt: AI 에게 보내는 사용자 메시지, needsAnswer: 현재 답안을 자동으로 포함할지
+ * 추가하려면 여기에만 항목을 넣으면 된다 (클라이언트는 /api/chat-quick-actions 로 받아 렌더).
+ */
 export const QUICK_ACTIONS = {
-  outline: '이 문제에 대한 답안의 개요(목차)를 제안해 주세요. 각 항목에 어떤 내용을 담아야 할지 한 줄씩 설명해 주세요.',
-  summarize_refs: '참고자료의 핵심 내용을 항목별로 요약해 주세요. 수치가 있으면 표로 정리해 주세요.',
-  feedback: '내 현재 답안 초안을 제출 형식과 평가 기준에 비추어 평가해 주세요. 잘한 점, 부족한 점, 구체적인 개선 제안을 순서대로 주세요. 글자 수 제한이 있으면 준수 여부도 알려 주세요.',
-  proofread: '내 현재 답안 초안의 문장을 다듬어 주세요. 의미는 유지하고, 수정한 부분과 이유를 간단히 표로 정리해 주세요.',
-  questions: '이 문제를 더 잘 풀기 위해 내가 스스로 던져봐야 할 질문 5개를 제안해 주세요.',
+  outline: { label: '📝 개요 제안', needsAnswer: false, prompt: '이 문제에 대한 답안의 개요(목차)를 제안해 주세요. 각 항목에 어떤 내용을 담아야 할지 한 줄씩 설명해 주세요.' },
+  summarize_refs: { label: '📊 자료 요약', needsAnswer: false, prompt: '참고자료의 핵심 내용을 항목별로 요약해 주세요. 수치가 있으면 표로 정리해 주세요.' },
+  feedback: { label: '✅ 답안 피드백', needsAnswer: true, prompt: '내 현재 답안 초안을 제출 형식과 평가 기준에 비추어 평가해 주세요. 잘한 점, 부족한 점, 구체적인 개선 제안을 순서대로 주세요. 글자 수 제한이 있으면 준수 여부도 알려 주세요.' },
+  proofread: { label: '✍️ 문장 다듬기', needsAnswer: true, prompt: '내 현재 답안 초안의 문장을 다듬어 주세요. 의미는 유지하고, 수정한 부분과 이유를 간단히 표로 정리해 주세요.' },
+  questions: { label: '❓ 질문 거리', needsAnswer: false, prompt: '이 문제를 더 잘 풀기 위해 내가 스스로 던져봐야 할 질문 5개를 제안해 주세요.' },
 };
 
 /** AI 문제집 생성 프롬프트 */

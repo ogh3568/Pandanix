@@ -7,14 +7,36 @@ export function escapeHtml(s) {
 }
 
 function inline(text) {
-  let s = escapeHtml(text);
-  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // 1) 코드 스팬을 먼저 떼어 두어 안의 *, _, | 가 서식으로 해석되지 않게 한다
+  const codes = [];
+  let s = String(text).replace(/`([^`\n]+)`/g, (_, c) => {
+    codes.push(`<code>${escapeHtml(c)}</code>`);
+    return `\u0000${codes.length - 1}\u0000`;
+  });
+  s = escapeHtml(s);
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>');
-  s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  s = s.replace(/(^|[^\w])__([^_]+)__(?!\w)/g, '$1<strong>$2</strong>');
+  s = s.replace(/(^|[^*\w])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  s = s.replace(/(^|[^\w])_([^_\n]+)_(?!\w)/g, '$1<em>$2</em>');
   s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
-  s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  return s;
+  // 링크: 절대 URL 은 새 탭, 상대 경로(.md 등)와 #앵커는 같은 창
+  s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, label, href) => {
+    if (/^javascript:/i.test(href)) return label;
+    const abs = /^https?:/i.test(href);
+    return `<a href="${href}"${abs ? ' target="_blank" rel="noopener"' : ''}>${label}</a>`;
+  });
+  // 2) 코드 스팬 복원
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => codes[Number(i)]);
+}
+
+/** 제목 텍스트 → 앵커 id (GitHub 방식과 비슷하게: 소문자, 공백→-, 문장부호 제거) */
+export function slugify(text) {
+  return String(text)
+    .replace(/<[^>]+>/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, '')
+    .replace(/\s+/g, '-');
 }
 
 export function renderMarkdown(md) {
@@ -44,7 +66,7 @@ export function renderMarkdown(md) {
     const h = /^(#{1,6})\s+(.*)$/.exec(line);
     if (h) {
       flushPara();
-      out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`);
+      out.push(`<h${h[1].length} id="${slugify(h[2])}">${inline(h[2])}</h${h[1].length}>`);
       i++;
       continue;
     }
@@ -72,6 +94,7 @@ export function renderMarkdown(md) {
     if (/^\s*([-*+]|\d+[.)])\s+/.test(line)) {
       flushPara();
       const ordered = /^\s*\d+[.)]\s+/.test(line);
+      const start = ordered ? Number(line.match(/^\s*(\d+)/)[1]) : 1;
       const items = [];
       while (i < lines.length && /^\s*([-*+]|\d+[.)])\s+/.test(lines[i])) {
         const indent = lines[i].match(/^\s*/)[0].length;
@@ -84,7 +107,7 @@ export function renderMarkdown(md) {
           i++;
         }
       }
-      out.push(renderList(items, ordered));
+      out.push(renderList(items, ordered, start));
       continue;
     }
     // 인용
@@ -108,18 +131,30 @@ export function renderMarkdown(md) {
 }
 
 function splitRow(line) {
-  return line
-    .trim()
-    .replace(/^\|/, '')
-    .replace(/\|$/, '')
-    .split(/(?<!\\)\|/)
-    .map((c) => c.trim().replace(/\\\|/g, '|'));
+  // 백틱 안의 | 와 \| 는 셀 구분자로 보지 않는다
+  const t = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  const cells = [];
+  let cur = '';
+  let inCode = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (c === '`') inCode = !inCode;
+    if (c === '\\' && t[i + 1] === '|') {
+      cur += '|';
+      i++;
+    } else if (c === '|' && !inCode) {
+      cells.push(cur.trim());
+      cur = '';
+    } else cur += c;
+  }
+  cells.push(cur.trim());
+  return cells;
 }
 
-function renderList(items, ordered) {
+function renderList(items, ordered, start = 1) {
   const tag = ordered ? 'ol' : 'ul';
   const base = Math.min(...items.map((it) => it.indent));
-  let html = `<${tag}>`;
+  let html = ordered && start !== 1 ? `<ol start="${start}">` : `<${tag}>`;
   let k = 0;
   while (k < items.length) {
     const it = items[k];

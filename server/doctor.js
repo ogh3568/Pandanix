@@ -9,7 +9,7 @@ import { PROVIDERS, loadSettings, loadCredentials, getAllowedRoots } from './con
 import { getProvider } from './providers/index.js';
 
 const require = createRequire(import.meta.url);
-const MIN_NODE_MAJOR = 18;
+const MIN_NODE_MAJOR = 22; // openai SDK 가 Node 22 이상을 요구한다 (package.json engines 와 함께 갱신)
 
 /**
  * @param {{live?: boolean, serverRunning?: boolean}} opts
@@ -108,7 +108,7 @@ export async function runDoctor({ live = false, serverRunning = false } = {}) {
     const has = Boolean(c.apiKey);
     if (has) anyKey = true;
     const isDefault = settings.defaultProvider === name;
-    const optional = name === 'custom';
+    const optional = Boolean(def.keyOptional);
     add({
       id: `key:${name}`,
       name: `API 키 - ${def.label}${isDefault ? ' (기본)' : ''}`,
@@ -168,13 +168,13 @@ export async function runDoctor({ live = false, serverRunning = false } = {}) {
   if (live) {
     for (const [name, def] of Object.entries(PROVIDERS)) {
       const c = creds[name] || {};
-      if (!c.apiKey && name !== 'custom') continue;
-      if (name === 'custom' && !c.baseUrl) continue;
+      if (!c.apiKey && !def.keyOptional) continue;
+      if (def.keyOptional && !c.baseUrl) continue;
       try {
         const r = await withTimeout(getProvider(name).ping(), 20000);
         add({ id: `live:${name}`, name: `연결 테스트 - ${def.label}`, status: 'ok', detail: r.detail, fix: '' });
       } catch (err) {
-        add({ id: `live:${name}`, name: `연결 테스트 - ${def.label}`, status: name === 'custom' ? 'warn' : 'fail', detail: err.message, fix: '키, Base URL, 네트워크(프록시/방화벽)를 확인하세요.' });
+        add({ id: `live:${name}`, name: `연결 테스트 - ${def.label}`, status: def.keyOptional ? 'warn' : 'fail', detail: err.message, fix: '키, Base URL, 네트워크(프록시/방화벽)를 확인하세요.' });
       }
     }
   }

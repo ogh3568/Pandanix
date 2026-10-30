@@ -13,7 +13,7 @@
     "validate:library": "node server/validate-library.js"
   },
   "engines": {
-    "node": ">=18.17"
+    "node": ">=22"
   },
   "license": "MIT",
   "dependencies": {

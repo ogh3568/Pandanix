@@ -36,14 +36,21 @@ chatRouter.post(
     const body = req.body || {};
     const settings = loadSettings();
     let userText = String(body.message || '').trim();
-    if (body.quickAction && QUICK_ACTIONS[body.quickAction]) userText = QUICK_ACTIONS[body.quickAction] + (userText ? `\n\n추가 요청: ${userText}` : '');
+    const qa = body.quickAction ? QUICK_ACTIONS[body.quickAction] : null;
+    if (qa) userText = qa.prompt + (userText ? `\n\n추가 요청: ${userText}` : '');
     if (!userText) throw httpError(400, '메시지가 비어 있습니다.');
 
     const { provider, model } = resolveProviderAndModel(body.provider, body.model);
     const providerImpl = getProvider(provider); // 키 없으면 여기서 400 (SSE 열기 전)
 
-    const context = { ...settings.chat, ...(body.context || {}) };
-    if (body.quickAction === 'feedback' || body.quickAction === 'proofread') context.answer = true;
+    // 기본값은 설정(include*), 요청 body.context 가 있으면 덮어쓴다
+    const context = {
+      problem: settings.chat.includeProblem !== false,
+      references: settings.chat.includeReferences !== false,
+      answer: Boolean(settings.chat.includeAnswer),
+      ...(body.context || {}),
+    };
+    if (qa?.needsAnswer) context.answer = true;
     const system = buildSystemPrompt({ workbookId: wb, problemId: p, context, answerText: body.answerText || '' });
 
     const history = store.getChat(wb, p).messages.filter((m) => m.role === 'user' || m.role === 'assistant');

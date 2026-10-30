@@ -9,7 +9,6 @@ let root, msgsEl, inputEl, scope = { wb: 'general', p: 'general' };
 let abort = null;
 let quickActions = {};
 
-const QUICK_LABELS = { outline: '📝 개요 제안', summarize_refs: '📊 자료 요약', feedback: '✅ 답안 피드백', proofread: '✍️ 문장 다듬기', questions: '❓ 질문 거리' };
 
 export async function initChat(el) {
   root = el;
@@ -18,7 +17,7 @@ export async function initChat(el) {
   root.innerHTML = `
     <div class="chat-wrap">
       <div class="pane-head"><h2>AI 채팅</h2><span class="badge" data-scope>일반</span><button class="btn-icon" data-clear title="대화 지우기">🗑</button></div>
-      <div class="quick-actions" data-quick>${Object.keys(quickActions).map((k) => `<button class="btn btn-sm" data-qa="${k}" title="${escapeHtml(quickActions[k])}">${QUICK_LABELS[k] || k}</button>`).join('')}</div>
+      <div class="quick-actions" data-quick>${Object.entries(quickActions).map(([k, q]) => `<button class="btn btn-sm" data-qa="${k}" title="${escapeHtml(q.prompt)}">${escapeHtml(q.label)}</button>`).join('')}</div>
       <div class="chat-messages" data-msgs></div>
       <div class="chat-compose">
         <div class="chat-options">
@@ -81,7 +80,7 @@ function appendMessage(m) {
   const el = document.createElement('div');
   el.className = `msg ${m.role === 'user' ? 'msg-user' : 'msg-assistant'} ${m.error ? 'msg-error' : ''}`;
   if (m.role === 'user') {
-    el.innerHTML = `${escapeHtml(m.content)}<div class="msg-meta">${m.quickAction ? `<span>빠른 작업: ${QUICK_LABELS[m.quickAction] || m.quickAction}</span>` : ''}<span>${fmtTime(m.ts)}</span></div>`;
+    el.innerHTML = `${escapeHtml(m.content)}<div class="msg-meta">${m.quickAction ? `<span>빠른 작업: ${escapeHtml(quickActions[m.quickAction]?.label || m.quickAction)}</span>` : ''}<span>${fmtTime(m.ts)}</span></div>`;
   } else {
     el.innerHTML = `<div class="prose" data-content>${renderMarkdown(m.content || '')}</div>
       <div class="msg-meta"><span>${escapeHtml(m.model || '')}</span>${m.usage ? `<span>토큰 ${m.usage.input ?? '?'}→${m.usage.output ?? '?'}</span>` : ''}<span>${fmtTime(m.ts)}</span></div>
@@ -103,9 +102,9 @@ function send(quickAction = null) {
   if (!state.model) return toast('상단바에서 모델을 지정하세요.', 'error');
   const context = {};
   root.querySelectorAll('[data-ctx]').forEach((c) => (context[c.dataset.ctx] = c.checked));
-  const answerText = context.answer || quickAction === 'feedback' || quickAction === 'proofread' ? safeGetText() : '';
+  const answerText = context.answer || quickActions[quickAction]?.needsAnswer ? safeGetText() : '';
   inputEl.value = '';
-  appendMessage({ role: 'user', content: quickAction ? (quickActions[quickAction] || quickAction) + (text ? `\n\n추가 요청: ${text}` : '') : text, quickAction, ts: new Date().toISOString() });
+  appendMessage({ role: 'user', content: quickAction ? (quickActions[quickAction]?.prompt || quickAction) + (text ? `\n\n추가 요청: ${text}` : '') : text, quickAction, ts: new Date().toISOString() });
   const el = appendMessage({ role: 'assistant', content: '', model: state.model });
   const content = el.querySelector('[data-content]');
   content.classList.add('typing');

@@ -23,7 +23,7 @@ export function initSidebar(el) {
 
 async function loadStatus() {
   try {
-    statusMap = await api.get('/api/answers-status');
+    statusMap = await api.answersStatus();
   } catch {}
 }
 
@@ -333,7 +333,7 @@ function renderReferences(body) {
       pv.innerHTML = '<span class="muted">불러오는 중…</span>';
       try {
         if (ref.isText) {
-          const text = await (await fetch(api.referenceUrl(wb.id, p.id, file))).text();
+          const text = await api.referenceText(wb.id, p.id, file);
           pv.innerHTML = ref.ext === '.md' ? `<div class="prose">${renderMarkdown(text)}</div>` : ref.ext === '.csv' ? renderCsv(text) : `<pre>${escapeHtml(text)}</pre>`;
         } else if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ref.ext)) {
           pv.innerHTML = `<img src="${api.referenceUrl(wb.id, p.id, file)}" style="max-width:100%" />`;

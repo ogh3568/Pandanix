@@ -47,6 +47,8 @@ export const PROVIDERS = {
     keyUrl: '',
     fields: ['apiKey', 'baseUrl'],
     note: 'Ollama, LM Studio, vLLM 등 OpenAI 호환 서버',
+    /** 키 없이도 동작하는 로컬 서버용. UI 경고·doctor 실패·키 검사에서 제외된다. */
+    keyOptional: true,
   },
 };
 

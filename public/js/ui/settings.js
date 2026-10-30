@@ -8,7 +8,7 @@ export async function openSettings(section = 'keys') {
   state.settings = await api.settings();
   const body = document.createElement('div');
   body.className = 'settings-grid';
-  const sections = [['keys', '🔑 API 키'], ['models', '🤖 기본 모델'], ['roots', '📁 파일 접근 폴더'], ['chat', '💬 채팅 옵션'], ['info', 'ℹ️ 정보']];
+  const sections = [['keys', '🔑 API 키'], ['models', '🤖 기본 모델'], ['roots', '📁 파일 접근 허용 폴더'], ['chat', '💬 채팅 옵션'], ['info', 'ℹ️ 정보']];
   body.innerHTML = `<nav class="settings-nav">${sections.map(([k, l]) => `<button data-sec="${k}" class="${k === section ? 'active' : ''}">${l}</button>`).join('')}</nav><div data-content></div>`;
   const content = body.querySelector('[data-content]');
   const show = (k) => {

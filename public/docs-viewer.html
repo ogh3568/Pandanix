@@ -34,14 +34,20 @@
     for (const f of files) (groups[f.group] ||= []).push(f);
     nav.innerHTML = Object.entries(groups).map(([g, fs]) => `<h3>${g}</h3>${fs.map((f) => `<a href="#${f.path}" data-path="${f.path}">${f.title}</a>`).join('')}`).join('');
     async function show() {
-      const path = location.hash.slice(1) || files[0]?.path;
+      const raw = decodeURIComponent(location.hash.slice(1));
+      const [path, anchor] = (raw || files[0]?.path || '').split('#');
       if (!path) return;
       nav.querySelectorAll('a').forEach((a) => a.classList.toggle('active', a.dataset.path === path));
       const res = await fetch('/docs/' + path);
       let md = await res.text();
       // 상대 링크를 뷰어 해시 링크로 변환
-      content.innerHTML = renderMarkdown(md).replace(/href="(?!https?:|#)([^"]+\.md)"/g, (m, p) => `href="#${resolve(path, p)}"`);
-      window.scrollTo(0, 0);
+      // 상대 .md 링크 → 뷰어 해시, 같은 문서 안의 #앵커 → 현재 문서 경로 + 앵커
+      content.innerHTML = renderMarkdown(md)
+        .replace(/href="(?!https?:|#)([^"#]+\.md)(#[^"]*)?"/g, (m, p, a) => `href="#${resolve(path, p)}${a || ''}"`)
+        .replace(/href="#(?!\S*\.md)([^"]+)"/g, (m, a) => `href="#${path}#${a}"`);
+      const target = anchor && document.getElementById(anchor);
+      if (target) target.scrollIntoView();
+      else window.scrollTo(0, 0);
     }
     function resolve(base, rel) {
       const parts = base.split('/').slice(0, -1);

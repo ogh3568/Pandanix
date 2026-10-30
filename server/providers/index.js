@@ -14,7 +14,7 @@ export function getProvider(name, { requireKey = true } = {}) {
   if (!def) throw httpError(400, `알 수 없는 프로바이더: ${name}`);
   const creds = loadCredentials()[name] || {};
   const settings = loadSettings();
-  if (requireKey && !creds.apiKey && name !== 'custom') {
+  if (requireKey && !creds.apiKey && !def.keyOptional) {
     throw httpError(400, `${def.label} API 키가 설정되지 않았습니다. 설정 화면에서 키를 입력하세요.`);
   }
   switch (def.kind) {

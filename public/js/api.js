@@ -49,6 +49,11 @@ export const api = {
   addReference: (wb, p, data) => request('POST', `/api/workbooks/${wb}/problems/${p}/references`, data),
   addReferenceFromPath: (wb, p, path, description) => request('POST', `/api/workbooks/${wb}/problems/${p}/references/from-path`, { path, description }),
   deleteReference: (wb, p, file) => request('DELETE', `/api/workbooks/${wb}/problems/${p}/references/${encodeURIComponent(file)}`),
+  referenceText: async (wb, p, file) => {
+    const res = await fetch(`/api/workbooks/${wb}/problems/${p}/references/${encodeURIComponent(file)}`);
+    if (!res.ok) throw new Error(`참고자료를 읽을 수 없습니다 (HTTP ${res.status})`);
+    return res.text();
+  },
   referenceUrl: (wb, p, file, download) => `/api/workbooks/${wb}/problems/${p}/references/${encodeURIComponent(file)}${download ? '?download=1' : ''}`,
 
   // 답안
@@ -60,6 +65,13 @@ export const api = {
   deleteAttachment: (wb, p, file) => request('DELETE', `/api/answers/${wb}/${p}/attachments/${encodeURIComponent(file)}`),
   attachmentUrl: (wb, p, file) => `/api/answers/${wb}/${p}/attachments/${encodeURIComponent(file)}`,
   exportAnswer: (wb, p, data) => request('POST', `/api/answers/${wb}/${p}/export`, data),
+  /** 내보내기 결과를 파일 본문(Blob)으로 받는다 (다운로드/클립보드용) */
+  exportAnswerBlob: async (wb, p, format) => {
+    const res = await fetch(`/api/answers/${wb}/${p}/export`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format }) });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+    return res.blob();
+  },
+  answersStatus: () => request('GET', '/api/answers-status'),
 
   // 채팅
   chat: (wb, p) => request('GET', `/api/chat/${wb}/${p}`),

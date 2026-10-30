@@ -41,7 +41,7 @@ function initProviderBar() {
   const modelInput = document.getElementById('model-input');
   const saved = prefs.get('provider');
   state.provider = saved && providers[saved] ? saved : settings.defaultProvider;
-  sel.innerHTML = Object.entries(providers).map(([k, p]) => `<option value="${k}" ${k === state.provider ? 'selected' : ''}>${credentials[k]?.configured || k === 'custom' ? '' : '⚠ '}${escapeHtml(p.label)}</option>`).join('');
+  sel.innerHTML = Object.entries(providers).map(([k, p]) => `<option value="${k}" ${k === state.provider ? 'selected' : ''}>${credentials[k]?.configured || p.keyOptional ? '' : '⚠ '}${escapeHtml(p.label)}</option>`).join('');
   const applyModel = () => {
     const perProvider = prefs.get('models', {});
     state.model = perProvider[state.provider] || settings.models[state.provider] || '';

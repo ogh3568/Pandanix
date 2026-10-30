@@ -2,6 +2,8 @@
 chcp 65001 >nul
 title Pandanix
 cd /d "%~dp0"
+rem 회사 프록시(HTTPS_PROXY)가 설정돼 있으면 Node 가 그 값을 쓰도록 한다 (Node 22.21+)
+set NODE_USE_ENV_PROXY=1
 
 where node >nul 2>nul
 if errorlevel 1 (

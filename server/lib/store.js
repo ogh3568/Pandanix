@@ -5,6 +5,10 @@ import path from 'node:path';
 import { DIRS, readJson, writeJson, httpError, safeName, exists } from './paths.js';
 import { newId, nowIso } from './ids.js';
 
+/** 답안 저장본 보관 개수와 최소 간격 (자동 저장이 1.5초마다 와도 2분에 1개만 남긴다) */
+export const HISTORY_KEEP = 20;
+export const HISTORY_MIN_GAP_MS = 2 * 60 * 1000;
+
 /** 텍스트로 읽어 AI 프롬프트에 넣을 수 있는 확장자 */
 export const TEXT_EXTS = new Set(['.md', '.txt', '.csv', '.json', '.tsv', '.html', '.htm', '.xml', '.yaml', '.yml', '.log', '.ini']);
 
@@ -34,7 +38,7 @@ export function listWorkbooks() {
     if (!wb) continue;
     out.push(summarizeWorkbook(wb));
   }
-  out.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title));
+  out.sort((a, b) => a.title.localeCompare(b.title, 'ko'));
   return out;
 }
 
@@ -266,13 +270,20 @@ export function saveAnswer(wbId, pId, { html, status }) {
     updatedAt: nowIso(),
   };
   writeJson(answerFile(wbId, pId), next);
-  // 버전 백업 (최근 20개)
+  // 버전 백업: 최근 저장본이 HISTORY_MIN_GAP_MS 안이면 덮어쓰고, 아니면 새로 만든다 (자동 저장으로 기록이 넘치지 않게)
   const histDir = path.join(answerDir(wbId, pId), 'history');
   fs.mkdirSync(histDir, { recursive: true });
-  const stamp = next.updatedAt.replace(/[:.]/g, '-');
-  fs.writeFileSync(path.join(histDir, `${stamp}.html`), next.html, 'utf8');
-  const files = fs.readdirSync(histDir).sort();
-  while (files.length > 20) fs.rmSync(path.join(histDir, files.shift()));
+  const files = fs.readdirSync(histDir).filter((f) => f.endsWith('.html')).sort();
+  const newest = files[files.length - 1];
+  const newestTime = newest ? Date.parse(newest.replace('.html', '').replace(/^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/, '$1T$2:$3:$4.$5Z')) : 0;
+  if (newest && Date.now() - newestTime < HISTORY_MIN_GAP_MS) {
+    fs.writeFileSync(path.join(histDir, newest), next.html, 'utf8');
+  } else {
+    const stamp = next.updatedAt.replace(/[:.]/g, '-');
+    fs.writeFileSync(path.join(histDir, `${stamp}.html`), next.html, 'utf8');
+    files.push(`${stamp}.html`);
+  }
+  while (files.length > HISTORY_KEEP) fs.rmSync(path.join(histDir, files.shift()), { force: true });
   return getAnswer(wbId, pId);
 }
 

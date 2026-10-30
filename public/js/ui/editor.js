@@ -2,7 +2,7 @@
 import { api, fileToBase64 } from '../api.js';
 import { state, on, emit } from '../state.js';
 import { escapeHtml, renderMarkdown } from '../markdown.js';
-import { toast, openModal, confirmDialog } from './modal.js';
+import { toast, openModal, confirmDialog, promptDialog } from './modal.js';
 import { pickPath } from './filepicker.js';
 
 let root, page, statusEl, scope = { wb: 'general', p: 'general' };
@@ -67,7 +67,17 @@ export function initEditor(el) {
   root.querySelector('[data-table]').addEventListener('mousedown', (e) => { e.preventDefault(); tableGrid(e.currentTarget); });
   root.querySelector('[data-image]').addEventListener('click', () => pickFile('image/*', insertImage));
   root.querySelector('[data-attach]').addEventListener('click', () => pickFile('*/*', attachFile));
-  root.querySelector('[data-link]').addEventListener('mousedown', (e) => { e.preventDefault(); const url = prompt('링크 주소'); if (url) exec('createLink', url); });
+  root.querySelector('[data-link]').addEventListener('mousedown', async (e) => {
+    e.preventDefault();
+    const sel = window.getSelection();
+    const saved = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+    const url = await promptDialog('링크 주소 (https://…)', { title: '링크 삽입', placeholder: 'https://' });
+    if (!url) return;
+    page.focus();
+    if (saved) { sel.removeAllRanges(); sel.addRange(saved); }
+    if (saved && !saved.collapsed) exec('createLink', url);
+    else insertHtml(`<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>`);
+  });
   root.querySelector('[data-save]').addEventListener('click', () => save(true));
   root.querySelector('[data-export]').addEventListener('click', exportMenu);
   root.querySelector('[data-history]').addEventListener('click', showHistory);
@@ -411,7 +421,7 @@ function exportMenu(e) {
     ['텍스트 (.txt) 다운로드', () => download('txt')],
     ['Markdown 을 로컬 폴더에 저장…', () => saveTo('md')],
     ['HTML 을 로컬 폴더에 저장…', () => saveTo('html')],
-    ['본문을 클립보드에 복사 (Markdown)', async () => { const r = await fetch(`/api/answers/${scope.wb}/${scope.p}/export`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format: 'md' }) }); await navigator.clipboard.writeText(await r.text()); toast('복사했습니다.', 'ok'); }],
+    ['본문을 클립보드에 복사 (Markdown)', async () => { await save(false); const blob = await api.exportAnswerBlob(scope.wb, scope.p, 'md'); await navigator.clipboard.writeText(await blob.text()); toast('복사했습니다.', 'ok'); }],
   ];
   const pop = document.createElement('div');
   pop.className = 'popover';
@@ -425,8 +435,7 @@ function exportMenu(e) {
 async function download(format) {
   if (scope.wb === 'general') return toast('먼저 문제를 선택하세요.', 'error');
   await save(false);
-  const res = await fetch(`/api/answers/${scope.wb}/${scope.p}/export`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format }) });
-  const blob = await res.blob();
+  const blob = await api.exportAnswerBlob(scope.wb, scope.p, format);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `${state.currentProblem?.title || 'answer'}.${format}`;
